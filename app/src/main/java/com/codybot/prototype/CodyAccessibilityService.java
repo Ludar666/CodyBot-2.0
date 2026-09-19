@@ -36,7 +36,11 @@ public class CodyAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
-        registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"), Context.RECEIVER_NOT_EXPORTED);
+        try {
+            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         showOverlay();
     }
 
