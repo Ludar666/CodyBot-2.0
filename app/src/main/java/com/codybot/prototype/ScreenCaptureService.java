@@ -1,4 +1,5 @@
 package com.codybot.prototype;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
 import android.app.*; import android.content.*; import android.graphics.*; import android.hardware.display.*; import android.media.*; import android.media.projection.*; import android.os.*; import android.util.DisplayMetrics; import java.nio.ByteBuffer;
 import com.google.mlkit.vision.common.InputImage; import com.google.mlkit.vision.text.*; import java.util.*;
