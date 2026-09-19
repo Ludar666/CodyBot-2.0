@@ -1,0 +1,17 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.codybot.prototype'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.codybot.prototype'
+        minSdk 24
+        targetSdk 30
+        versionCode 30
+        versionName '3.0'
+    }
+}
+
+dependencies {
+    implementation 'com.google.mlkit:text-recognition:16.0.1'
+}
