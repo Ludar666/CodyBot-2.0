@@ -26,6 +26,7 @@ public class ScreenCaptureService extends Service {
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
     private Handler handler = new Handler(Looper.getMainLooper());
+    private boolean isCapturing = false;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -34,8 +35,13 @@ public class ScreenCaptureService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        int resultCode = intent.getIntExtra("resultCode", 0);
-        Intent data = intent.getParcelableExtra("data");
+        if (intent != null && intent.hasExtra("ACTION_TOGGLE")) {
+            toggleCapture();
+            return START_NOT_STICKY;
+        }
+
+        int resultCode = intent != null ? intent.getIntExtra("resultCode", 0) : 0;
+        Intent data = intent != null ? intent.getParcelableExtra("data") : null;
 
         if (resultCode != 0 && data != null) {
             MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
@@ -45,7 +51,23 @@ public class ScreenCaptureService extends Service {
         return START_NOT_STICKY;
     }
 
+    private void toggleCapture() {
+        if (isCapturing) {
+            stopCapture();
+            updateOverlayText("Cattura interrotta");
+        } else {
+            if (mediaProjection != null) {
+                startCapture();
+            } else {
+                updateOverlayText("Errore: Riavviare l'app");
+            }
+        }
+    }
+
     private void startCapture() {
+        isCapturing = true;
+        updateOverlayText("SCAN: cattura in corso...");
+
         WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         DisplayMetrics metrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getMetrics(metrics);
@@ -56,9 +78,8 @@ public class ScreenCaptureService extends Service {
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_GLOBAL_BRACKET,
                 imageReader.getSurface(), null, handler);
 
-        // Timeout di 5 secondi per evitare il blocco permanente
         handler.postDelayed(() -> {
-            if (virtualDisplay != null) {
+            if (isCapturing && virtualDisplay != null) {
                 stopCapture();
                 updateOverlayText("Errore: Timeout cattura schermo");
             }
@@ -116,13 +137,10 @@ public class ScreenCaptureService extends Service {
     }
 
     private void stopCapture() {
+        isCapturing = false;
         if (virtualDisplay != null) {
             virtualDisplay.release();
             virtualDisplay = null;
-        }
-        if (mediaProjection != null) {
-            mediaProjection.stop();
-            mediaProjection = null;
         }
     }
 }
