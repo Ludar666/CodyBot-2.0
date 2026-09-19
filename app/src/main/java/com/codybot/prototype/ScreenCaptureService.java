@@ -22,6 +22,9 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import java.nio.ByteBuffer;
 
 public class ScreenCaptureService extends Service {
+    public static final String ACTION_CAPTURE_ONCE = "com.codybot.ACTION_CAPTURE_ONCE";
+    public static final String ACTION_TOGGLE = "com.codybot.ACTION_TOGGLE";
+
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
@@ -35,7 +38,7 @@ public class ScreenCaptureService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && intent.hasExtra("ACTION_TOGGLE")) {
+        if (intent != null && ACTION_TOGGLE.equals(intent.getAction())) {
             toggleCapture();
             return START_NOT_STICKY;
         }
@@ -47,6 +50,12 @@ public class ScreenCaptureService extends Service {
             MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
             mediaProjection = projectionManager.getMediaProjection(resultCode, data);
             startCapture();
+        } else if (intent != null && ACTION_CAPTURE_ONCE.equals(intent.getAction())) {
+            if (mediaProjection != null) {
+                startCapture();
+            } else {
+                updateOverlayText("Errore: MediaProjection non attivo");
+            }
         }
         return START_NOT_STICKY;
     }
@@ -75,7 +84,7 @@ public class ScreenCaptureService extends Service {
         imageReader = ImageReader.newInstance(metrics.widthPixels, metrics.heightPixels, PixelFormat.RGBA_8888, 2);
         virtualDisplay = mediaProjection.createVirtualDisplay("CodyBotCapture",
                 metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_GLOBAL_BRACKET,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 imageReader.getSurface(), null, handler);
 
         handler.postDelayed(() -> {
