@@ -1,51 +1,96 @@
 package com.codybot.prototype;
 
 import android.accessibilityservice.AccessibilityService;
-import android.accessibilityservice.GestureDescription;
-import android.content.*;
-import android.graphics.Path;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.PixelFormat;
-import android.os.*;
-import android.view.*;
-import android.widget.*;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
-import java.util.*;
+import android.widget.Button;
+import android.widget.TextView;
 
 public class CodyAccessibilityService extends AccessibilityService {
-    public static final String ACTION_SCAN = "com.codybot.prototype.SCAN";
-    public static final String ACTION_CAPTURE_RESULT = "com.codybot.prototype.CAPTURE_RESULT";
-    private WindowManager wm; private View overlay; private TextView status;
-    private final BroadcastReceiver receiver = new BroadcastReceiver(){ @Override public void onReceive(Context c, Intent i){
-        if(ACTION_CAPTURE_RESULT.equals(i.getAction())) { String clue=i.getStringExtra("clue"); String raw=i.getStringExtra("raw"); updateStatus(clue,raw); }
-    }};
+    private WindowManager windowManager;
+    private View overlayView;
+    private TextView statusText;
+    private Button toggleButton;
 
-    @Override public void onServiceConnected(){
-        super.onServiceConnected();
-        wm=(WindowManager)getSystemService(WINDOW_SERVICE); showOverlay();
-        IntentFilter f=new IntentFilter(ACTION_CAPTURE_RESULT);
-        if(Build.VERSION.SDK_INT>=33) registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED); else registerReceiver(receiver,f);
+    private final BroadcastReceiver overlayReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent != null && intent.hasExtra("message")) {
+                String msg = intent.getStringExtra("message");
+                if (statusText != null) {
+                    statusText.setText(msg);
+                }
+            }
+        }
+    };
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"));
+        showOverlay();
     }
-    private void showOverlay(){
-        if(overlay!=null)return;
-        LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(12,8,12,8); box.setBackgroundColor(0xDD18212B);
-        TextView head=new TextView(this); head.setText("🤖 CodyBot 3.0"); head.setTextColor(0xFFFFFFFF); head.setTextSize(14); box.addView(head);
-        LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
-        Button scan=new Button(this); scan.setText("SCAN"); scan.setOnClickListener(v->requestScan()); row.addView(scan,new LinearLayout.LayoutParams(0,55,1));
-        Button auto=new Button(this); auto.setText("AUTO"); auto.setOnClickListener(v->updateStatus("AUTO: in preparazione","Prima testiamo SCAN")); row.addView(auto,new LinearLayout.LayoutParams(0,55,1));
-        Button stop=new Button(this); stop.setText("STOP"); stop.setOnClickListener(v->updateStatus("STOP","")); row.addView(stop,new LinearLayout.LayoutParams(0,55,1));
-        box.addView(row);
-        status=new TextView(this); status.setText("Pronto. Premi SCAN."); status.setTextColor(0xFFFFFFFF); status.setTextSize(12); box.addView(status);
-        overlay=box;
-        WindowManager.LayoutParams p=new WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,PixelFormat.TRANSLUCENT);
-        p.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; p.y=80; wm.addView(overlay,p);
+
+    private void showOverlay() {
+        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        layout.setBackgroundColor(0xAA000000);
+        layout.setPadding(16, 16, 16, 16);
+
+        statusText = new TextView(this);
+        statusText.setText("CodyBot 3.1 Pronto");
+        statusText.setTextColor(0xFFFFFFFF);
+        statusText.setPadding(0, 0, 16, 0);
+
+        toggleButton = new Button(this);
+        toggleButton.setText("START / STOP");
+        toggleButton.setOnClickListener(v -> {
+            Intent intent = new Intent(this, ScreenCaptureService.class);
+            intent.setAction(ScreenCaptureService.ACTION_TOGGLE);
+            startService(intent);
+        });
+
+        layout.addView(statusText);
+        layout.addView(toggleButton);
+        overlayView = layout;
+
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT);
+
+        params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        params.y = 100;
+
+        windowManager.addView(overlayView, params);
     }
-    private void requestScan(){
-        Intent i=new Intent(this,ScreenCaptureService.class); i.setAction(ScreenCaptureService.ACTION_CAPTURE_ONCE); startService(i);
-        updateStatus("SCAN: cattura in corso…","");
+
+    @Override
+    public void onAccessibilityEvent(AccessibilityEvent event) {}
+
+    @Override
+    public void onInterrupt() {}
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (overlayReceiver != null) {
+            unregisterReceiver(overlayReceiver);
+        }
+        if (overlayView != null && windowManager != null) {
+            windowManager.removeView(overlayView);
+        }
     }
-    private void updateStatus(String clue,String raw){ if(status==null)return; String s=clue==null?"Nessun testo riconosciuto":clue; if(raw!=null && !raw.isEmpty() && !raw.equals(clue)) s += "\nOCR: "+raw; status.setText(s); }
-    public void tap(float x,float y){ Path path=new Path(); path.moveTo(x,y); GestureDescription.StrokeDescription st=new GestureDescription.StrokeDescription(path,0,60); dispatchGesture(new GestureDescription.Builder().addStroke(st).build(),null,null); }
-    @Override public void onAccessibilityEvent(AccessibilityEvent e){}
-    @Override public void onInterrupt(){}
-    @Override public void onDestroy(){ try{unregisterReceiver(receiver);}catch(Exception ignored){} if(overlay!=null)try{wm.removeView(overlay);}catch(Exception ignored){} super.onDestroy(); }
 }
