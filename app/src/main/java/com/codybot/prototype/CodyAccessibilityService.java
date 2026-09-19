@@ -1,4 +1,4 @@
-package com.codybot.prototype;
+package com.codybot.app;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.BroadcastReceiver;

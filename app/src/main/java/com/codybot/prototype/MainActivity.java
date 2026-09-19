@@ -1,4 +1,4 @@
-package com.codybot.prototype;
+package com.codybot.app;
 
 import android.app.Activity;
 import android.content.Context;

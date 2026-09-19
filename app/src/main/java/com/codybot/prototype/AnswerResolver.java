@@ -1,4 +1,4 @@
-package com.codybot.prototype;
+package com.codybot.app;
 
 import java.net.*; import java.io.*; import java.util.*; import java.util.regex.*;
 
