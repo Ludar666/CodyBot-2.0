@@ -26,11 +26,10 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import java.nio.ByteBuffer;
 
 public class ScreenCaptureService extends Service {
-    public static final String ACTION_CAPTURE_ONCE = "com.codybot.ACTION_CAPTURE_ONCE";
     public static final String ACTION_TOGGLE = "com.codybot.ACTION_TOGGLE";
     private static final String CHANNEL_ID = "CodyBotCaptureChannel";
 
-    private MediaProjection mediaProjection;
+    private static MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
     private Handler handler = new Handler(Looper.getMainLooper());
@@ -45,59 +44,45 @@ public class ScreenCaptureService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        Notification notification = createNotification();
-        startForeground(101, notification);
+        startForeground(101, createNotification());
     }
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "CodyBot Cattura Schermo",
-                    NotificationManager.IMPORTANCE_LOW
-            );
+                    CHANNEL_ID, "CodyBot Capture", NotificationManager.IMPORTANCE_LOW);
             NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
+            if (manager != null) manager.createNotificationChannel(channel);
         }
     }
 
     private Notification createNotification() {
-        Notification.Builder builder;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            builder = new Notification.Builder(this, CHANNEL_ID);
-        } else {
-            builder = new Notification.Builder(this);
-        }
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
+                new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
         return builder.setContentTitle("CodyBot 3.0")
-                .setContentText("Cattura schermo attiva")
+                .setContentText("Servizio attivo")
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .build();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_TOGGLE.equals(intent.getAction())) {
-            toggleCapture();
-            return START_NOT_STICKY;
-        }
+        if (intent != null) {
+            int resultCode = intent.getIntExtra("resultCode", 0);
+            Intent data = intent.getParcelableExtra("data");
 
-        int resultCode = intent != null ? intent.getIntExtra("resultCode", 0) : 0;
-        Intent data = intent != null ? intent.getParcelableExtra("data") : null;
+            if (resultCode != 0 && data != null) {
+                MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+                mediaProjection = projectionManager.getMediaProjection(resultCode, data);
+                updateOverlayText("MediaProjection Attivo!");
+                return START_STICKY;
+            }
 
-        if (resultCode != 0 && data != null) {
-            MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
-            mediaProjection = projectionManager.getMediaProjection(resultCode, data);
-            startCapture();
-        } else if (intent != null && ACTION_CAPTURE_ONCE.equals(intent.getAction())) {
-            if (mediaProjection != null) {
-                startCapture();
-            } else {
-                updateOverlayText("Errore: MediaProjection non attivo");
+            if (ACTION_TOGGLE.equals(intent.getAction())) {
+                toggleCapture();
             }
         }
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     private void toggleCapture() {
@@ -108,14 +93,17 @@ public class ScreenCaptureService extends Service {
             if (mediaProjection != null) {
                 startCapture();
             } else {
-                updateOverlayText("Errore: Riavviare l'app");
+                Intent i = new Intent(this, MainActivity.class);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                updateOverlayText("Autorizza la cattura nell'app");
             }
         }
     }
 
     private void startCapture() {
         isCapturing = true;
-        updateOverlayText("SCAN: cattura in corso...");
+        updateOverlayText("SCAN in corso...");
 
         WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         DisplayMetrics metrics = new DisplayMetrics();
@@ -127,13 +115,6 @@ public class ScreenCaptureService extends Service {
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 imageReader.getSurface(), null, handler);
 
-        handler.postDelayed(() -> {
-            if (isCapturing && virtualDisplay != null) {
-                stopCapture();
-                updateOverlayText("Errore: Timeout cattura schermo");
-            }
-        }, 5000);
-
         imageReader.setOnImageAvailableListener(reader -> {
             Image image = reader.acquireLatestImage();
             if (image != null) {
@@ -142,8 +123,6 @@ public class ScreenCaptureService extends Service {
                 stopCapture();
                 if (bitmap != null) {
                     processOCR(bitmap);
-                } else {
-                    updateOverlayText("Errore: Frame non valido");
                 }
             }
         }, handler);
