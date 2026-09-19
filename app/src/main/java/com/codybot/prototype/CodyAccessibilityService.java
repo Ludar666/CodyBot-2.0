@@ -5,13 +5,14 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class CodyAccessibilityService extends AccessibilityService {
@@ -33,27 +34,29 @@ public class CodyAccessibilityService extends AccessibilityService {
     };
 
     @Override
-    public void onCreate() {
-        super.onCreate();
-        registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"));
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+        registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"), Context.RECEIVER_NOT_EXPORTED);
         showOverlay();
     }
 
     private void showOverlay() {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        
-        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
-        layout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        layout.setBackgroundColor(0xAA000000);
-        layout.setPadding(16, 16, 16, 16);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.HORIZONTAL);
+        layout.setBackgroundColor(Color.parseColor("#CC000000"));
+        layout.setPadding(32, 16, 32, 16);
 
         statusText = new TextView(this);
         statusText.setText("CodyBot 3.1 Pronto");
-        statusText.setTextColor(0xFFFFFFFF);
-        statusText.setPadding(0, 0, 16, 0);
+        statusText.setTextColor(Color.WHITE);
+        statusText.setTextSize(14);
+        statusText.setPadding(0, 0, 24, 0);
 
         toggleButton = new Button(this);
         toggleButton.setText("START / STOP");
+        toggleButton.setTextSize(12);
         toggleButton.setOnClickListener(v -> {
             Intent intent = new Intent(this, ScreenCaptureService.class);
             intent.setAction(ScreenCaptureService.ACTION_TOGGLE);
@@ -74,7 +77,11 @@ public class CodyAccessibilityService extends AccessibilityService {
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         params.y = 100;
 
-        windowManager.addView(overlayView, params);
+        try {
+            windowManager.addView(overlayView, params);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -86,11 +93,13 @@ public class CodyAccessibilityService extends AccessibilityService {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (overlayReceiver != null) {
+        try {
             unregisterReceiver(overlayReceiver);
-        }
+        } catch (Exception ignored) {}
         if (overlayView != null && windowManager != null) {
-            windowManager.removeView(overlayView);
+            try {
+                windowManager.removeView(overlayView);
+            } catch (Exception ignored) {}
         }
     }
 }
