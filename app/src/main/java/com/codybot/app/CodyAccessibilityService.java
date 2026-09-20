@@ -1,34 +1,40 @@
 package com.codybot.app;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
-import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import java.util.List;
+import java.text.Normalizer;
+import java.util.Locale;
 
 public class CodyAccessibilityService extends AccessibilityService {
     private WindowManager windowManager;
     private View overlayView;
     private TextView statusText;
     private Button toggleButton;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final BroadcastReceiver overlayReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent == null) return;
-            
+
             if ("com.codybot.UPDATE_OVERLAY".equals(intent.getAction()) && intent.hasExtra("message") && statusText != null) {
                 statusText.setText(intent.getStringExtra("message"));
             } else if ("com.codybot.AUTO_TYPE".equals(intent.getAction()) && intent.hasExtra("answer")) {
@@ -63,7 +69,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         layout.setPadding(24, 12, 24, 12);
 
         statusText = new TextView(this);
-        statusText.setText("CodyBot 3.1 Pronto");
+        statusText.setText("CodyBot 3.2 Pronto");
         statusText.setTextColor(Color.WHITE);
         statusText.setTextSize(14);
         statusText.setPadding(0, 0, 16, 0);
@@ -75,11 +81,8 @@ public class CodyAccessibilityService extends AccessibilityService {
             Intent intent = new Intent(this, ScreenCaptureService.class);
             intent.setAction(ScreenCaptureService.ACTION_TOGGLE);
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent);
-                } else {
-                    startService(intent);
-                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent);
+                else startService(intent);
             } catch (Exception e) {
                 if (statusText != null) statusText.setText("Errore avvio cattura: " + e.getClass().getSimpleName());
             }
@@ -98,48 +101,75 @@ public class CodyAccessibilityService extends AccessibilityService {
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         params.y = 100;
 
-        try {
-            windowManager.addView(overlayView, params);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        try { windowManager.addView(overlayView, params); }
+        catch (Exception e) { e.printStackTrace(); }
     }
 
+    /**
+     * CodyCross draws its keyboard as a game surface, so the individual keys
+     * are not reliable AccessibilityNodes. Use AccessibilityService gestures
+     * and the stable QWERTY keyboard geometry instead.
+     */
     private void autoTypeAnswer(String answer) {
-        String cleanAnswer = answer.toUpperCase().replace(" ", "");
-        new Thread(() -> {
-            for (char letter : cleanAnswer.toCharArray()) {
-                boolean clicked = clickKeyOnScreen(String.valueOf(letter));
-                try {
-                    Thread.sleep(300);
-                } catch (InterruptedException ignored) {}
-            }
-        }).start();
+        String clean = normalizeForKeyboard(answer);
+        if (clean.isEmpty()) return;
+        handler.post(() -> typeCharacter(clean, 0));
     }
 
-    private boolean clickKeyOnScreen(String letter) {
-        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode == null) return false;
-
-        List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByText(letter);
-        if (nodes != null && !nodes.isEmpty()) {
-            for (AccessibilityNodeInfo node : nodes) {
-                if (node.isClickable()) {
-                    node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                    return true;
-                } else {
-                    AccessibilityNodeInfo parent = node.getParent();
-                    while (parent != null) {
-                        if (parent.isClickable()) {
-                            parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                            return true;
-                        }
-                        parent = parent.getParent();
-                    }
-                }
-            }
+    private void typeCharacter(String answer, int index) {
+        if (index >= answer.length()) {
+            if (statusText != null) statusText.setText("Completato: " + answer);
+            return;
         }
-        return false;
+
+        char c = answer.charAt(index);
+        if (!tapKeyboardKey(c)) {
+            if (statusText != null) statusText.setText("Tasto non trovato: " + c);
+            return;
+        }
+        handler.postDelayed(() -> typeCharacter(answer, index + 1), 140);
+    }
+
+    private String normalizeForKeyboard(String answer) {
+        String s = Normalizer.normalize(answer.toUpperCase(Locale.ITALIAN), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+        return s.replaceAll("[^A-Z]", "");
+    }
+
+    private boolean tapKeyboardKey(char key) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false;
+
+        String row1 = "QWERTYUIOP";
+        String row2 = "ASDFGHJKL";
+        String row3 = "ZXCVBNM";
+        int row;
+        int index;
+        if ((index = row1.indexOf(key)) >= 0) row = 0;
+        else if ((index = row2.indexOf(key)) >= 0) row = 1;
+        else if ((index = row3.indexOf(key)) >= 0) row = 2;
+        else return false;
+
+        DisplayMetrics dm = new DisplayMetrics();
+        windowManager.getDefaultDisplay().getRealMetrics(dm);
+        float w = dm.widthPixels;
+        float h = dm.heightPixels;
+
+        // Coordinates are normalized to CodyCross' portrait QWERTY layout.
+        float x;
+        int count;
+        float offset;
+        if (row == 0) { count = 10; offset = 0f; }
+        else if (row == 1) { count = 9; offset = 0.05f; }
+        else { count = 7; offset = 0.15f; }
+        x = (offset + (index + 0.5f) * (0.9f / count)) * w;
+        float y = (row == 0 ? 0.823f : row == 1 ? 0.886f : 0.949f) * h;
+
+        Path path = new Path();
+        path.moveTo(x, y);
+        GestureDescription.StrokeDescription stroke =
+                new GestureDescription.StrokeDescription(path, 0, 30);
+        GestureDescription gesture = new GestureDescription.Builder().addStroke(stroke).build();
+        return dispatchGesture(gesture, null, null);
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
