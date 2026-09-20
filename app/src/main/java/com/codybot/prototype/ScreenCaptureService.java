@@ -30,7 +30,6 @@ import java.util.concurrent.Executors;
 public class ScreenCaptureService extends Service {
     public static final String ACTION_TOGGLE = "com.codybot.ACTION_TOGGLE";
     private static final String CHANNEL_ID = "CodyBotCaptureChannel";
-
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
@@ -40,13 +39,11 @@ public class ScreenCaptureService extends Service {
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
-    @Override
-    public void onCreate() {
+    @Override public void onCreate() {
         super.onCreate();
         createNotificationChannel();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(101, createNotification(),
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+            startForeground(101, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
         } else {
             startForeground(101, createNotification());
         }
@@ -54,8 +51,7 @@ public class ScreenCaptureService extends Service {
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "CodyBot Capture", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "CodyBot Capture", NotificationManager.IMPORTANCE_LOW);
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
@@ -63,22 +59,18 @@ public class ScreenCaptureService extends Service {
 
     private Notification createNotification() {
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                ? new Notification.Builder(this, CHANNEL_ID)
-                : new Notification.Builder(this);
-        return builder.setContentTitle("CodyBot 3.1")
+                ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
+        return builder.setContentTitle("CodyBot 3.2")
                 .setContentText("Servizio cattura attivo")
-                .setSmallIcon(android.R.drawable.ic_menu_camera)
-                .build();
+                .setSmallIcon(android.R.drawable.ic_menu_camera).build();
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+    @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) return START_STICKY;
         int resultCode = intent.getIntExtra("resultCode", 0);
         Intent data = intent.getParcelableExtra("data");
         if (resultCode != 0 && data != null) {
-            MediaProjectionManager projectionManager =
-                    (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+            MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
             if (projectionManager != null) {
                 mediaProjection = projectionManager.getMediaProjection(resultCode, data);
                 updateOverlayText("MediaProjection attivo");
@@ -109,24 +101,18 @@ public class ScreenCaptureService extends Service {
         if (mediaProjection == null || isCapturing) return;
         isCapturing = true;
         updateOverlayText("SCAN: cattura in corso...");
-
         WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         DisplayMetrics metrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getMetrics(metrics);
-
-        imageReader = ImageReader.newInstance(
-                metrics.widthPixels, metrics.heightPixels, PixelFormat.RGBA_8888, 2);
-        virtualDisplay = mediaProjection.createVirtualDisplay(
-                "CodyBotCapture", metrics.widthPixels, metrics.heightPixels,
-                metrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(), null, handler);
+        imageReader = ImageReader.newInstance(metrics.widthPixels, metrics.heightPixels, PixelFormat.RGBA_8888, 2);
+        virtualDisplay = mediaProjection.createVirtualDisplay("CodyBotCapture", metrics.widthPixels, metrics.heightPixels,
+                metrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, imageReader.getSurface(), null, handler);
 
         imageReader.setOnImageAvailableListener(reader -> {
             Image image = reader.acquireLatestImage();
             if (image == null) return;
             Bitmap bitmap = null;
-            try { bitmap = imageToBitmap(image); }
-            finally { image.close(); }
+            try { bitmap = imageToBitmap(image); } finally { image.close(); }
             stopCapture();
             if (bitmap != null) {
                 Bitmap clueBitmap = cropClue(bitmap);
@@ -143,10 +129,8 @@ public class ScreenCaptureService extends Service {
         }, 5000);
     }
 
-    /** CodyCross clue band: lower-middle area, directly above the keyboard. */
     private Bitmap cropClue(Bitmap source) {
-        int w = source.getWidth();
-        int h = source.getHeight();
+        int w = source.getWidth(), h = source.getHeight();
         int left = Math.max(0, Math.round(w * 0.05f));
         int top = Math.max(0, Math.round(h * 0.62f));
         int right = Math.min(w, Math.round(w * 0.95f));
@@ -158,13 +142,10 @@ public class ScreenCaptureService extends Service {
     private Bitmap imageToBitmap(Image image) {
         Image.Plane[] planes = image.getPlanes();
         ByteBuffer buffer = planes[0].getBuffer();
-        int pixelStride = planes[0].getPixelStride();
-        int rowStride = planes[0].getRowStride();
-        int width = image.getWidth();
-        int height = image.getHeight();
+        int pixelStride = planes[0].getPixelStride(), rowStride = planes[0].getRowStride();
+        int width = image.getWidth(), height = image.getHeight();
         int rowPadding = rowStride - pixelStride * width;
-        Bitmap bitmap = Bitmap.createBitmap(
-                width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
+        Bitmap bitmap = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
         bitmap.copyPixelsFromBuffer(buffer);
         Bitmap cropped = Bitmap.createBitmap(bitmap, 0, 0, width, height);
         if (cropped != bitmap) bitmap.recycle();
@@ -189,6 +170,11 @@ public class ScreenCaptureService extends Service {
                                 updateOverlayText("INDIZIO: " + clue + "\nRISPOSTA: non trovata");
                             } else {
                                 updateOverlayText("INDIZIO: " + clue + "\nRISPOSTA: " + answer);
+                                // The accessibility service performs the actual key taps.
+                                Intent fill = new Intent("com.codybot.FILL_ANSWER");
+                                fill.setPackage(getPackageName());
+                                fill.putExtra("answer", answer);
+                                sendBroadcast(fill);
                             }
                         });
                     });
@@ -196,7 +182,7 @@ public class ScreenCaptureService extends Service {
                 .addOnFailureListener(e -> updateOverlayText("Errore OCR: " + e.getMessage()))
                 .addOnCompleteListener(task -> {
                     recognizer.close();
-                    clueBitmap.recycle();
+                    if (!clueBitmap.isRecycled()) clueBitmap.recycle();
                 });
     }
 
@@ -213,8 +199,7 @@ public class ScreenCaptureService extends Service {
         if (imageReader != null) { imageReader.close(); imageReader = null; }
     }
 
-    @Override
-    public void onDestroy() {
+    @Override public void onDestroy() {
         stopCapture();
         resolverExecutor.shutdownNow();
         if (mediaProjection != null) { mediaProjection.stop(); mediaProjection = null; }
