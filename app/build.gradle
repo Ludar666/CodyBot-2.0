@@ -3,12 +3,19 @@ plugins { id 'com.android.application' }
 android {
     namespace 'com.codybot.app'
     compileSdk 35
+
     defaultConfig {
         applicationId 'com.codybot.app'
         minSdk 24
         targetSdk 30
-        versionCode 30
-        versionName '3.0'
+        versionCode 31
+        versionName '3.1'
+    }
+
+    // Android 11 (API 30) rejects APKs whose resources.arsc is compressed.
+    // Keep the resource table uncompressed so the APK is installable on the Mi 9T.
+    androidResources {
+        noCompress 'arsc'
     }
 }
 
