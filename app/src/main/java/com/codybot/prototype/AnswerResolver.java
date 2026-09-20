@@ -6,17 +6,13 @@ import java.util.*;
 import java.util.regex.*;
 
 public class AnswerResolver {
-    public static String resolve(String clue) {
-        return resolve(clue, 0);
-    }
+    public static String resolve(String clue) { return resolve(clue, 0); }
 
     public static String resolve(String clue, int expectedLength) {
         if (clue == null) return "";
         String n = clue.trim().replaceAll("\\s+", " ");
         String lower = n.toLowerCase(Locale.ITALIAN);
 
-        // Known CodyCross clue: the crossword entry is DILUNA (6 letters),
-        // not the full song title "Tintarella di luna".
         if (lower.contains("la tintarella cantata da mina")) return fit("DILUNA", expectedLength > 0 ? expectedLength : 6);
         if (lower.contains("rapporto intimo consumato tra consanguinei")) return fit("INCESTO", expectedLength);
         if (lower.contains("infiammazione della mucosa orale")) return fit("STOMATITE", expectedLength);
@@ -38,11 +34,10 @@ public class AnswerResolver {
                 "\"" + clue + "\" CodyCross soluzione risposta" + lengthPart,
                 "\"" + clue + "\" cruciverba soluzione" + lengthPart
         };
-
         for (String query : queries) {
             String html = fetchGoogle(query);
             if (html.isEmpty()) continue;
-            String answer = extractCandidate(html, expectedLength);
+            String answer = extractCandidate(html, clue, expectedLength);
             if (!answer.isEmpty()) return answer;
         }
         return "";
@@ -53,7 +48,7 @@ public class AnswerResolver {
             String q = URLEncoder.encode(query, "UTF-8");
             URL u = new URL("https://www.google.com/search?q=" + q + "&hl=it");
             HttpURLConnection c = (HttpURLConnection) u.openConnection();
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.2");
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.3");
             c.setConnectTimeout(5000);
             c.setReadTimeout(7000);
             try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
@@ -62,12 +57,10 @@ public class AnswerResolver {
                 while ((line = r.readLine()) != null) b.append(line).append('\n');
                 return b.toString();
             }
-        } catch (Exception ignored) {
-            return "";
-        }
+        } catch (Exception ignored) { return ""; }
     }
 
-    private static String extractCandidate(String html, int expectedLength) {
+    private static String extractCandidate(String html, String clue, int expectedLength) {
         String text = html.replaceAll("<[^>]+>", " ")
                 .replaceAll("&quot;", "\"")
                 .replaceAll("&#39;", "'")
@@ -75,19 +68,17 @@ public class AnswerResolver {
                 .replaceAll("&nbsp;", " ")
                 .replaceAll("\\s+", " ");
 
-        Pattern p = Pattern.compile(
-                "(?i)(?:risposta|soluzione)(?:\\s+di\\s+[^:]{0,30})?\\s*[:\\-]?\\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,35})");
+        Pattern p = Pattern.compile("(?i)(?:risposta|soluzione)(?:\\s+di\\s+[^:]{0,30})?\\s*[:\\-]?\\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,35})");
         Matcher m = p.matcher(text);
         while (m.find()) {
-            String candidate = cleanCandidate(m.group(1));
-            String valid = validateCandidate(candidate, expectedLength);
+            String valid = validateCandidate(cleanCandidate(m.group(1)), expectedLength);
             if (!valid.isEmpty()) return valid;
         }
 
         String lower = text.toLowerCase(Locale.ITALIAN);
         int cluePos = lower.indexOf(clue.toLowerCase(Locale.ITALIAN));
         if (cluePos >= 0) {
-            String window = text.substring(cluePos, Math.min(text.length(), cluePos + 700));
+            String window = text.substring(cluePos, Math.min(text.length(), cluePos + 1000));
             Matcher wm = Pattern.compile("(?i)(?:risposta|soluzione)\\s*[:\\-]?\\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' -]{1,35})").matcher(window);
             while (wm.find()) {
                 String valid = validateCandidate(cleanCandidate(wm.group(1)), expectedLength);
