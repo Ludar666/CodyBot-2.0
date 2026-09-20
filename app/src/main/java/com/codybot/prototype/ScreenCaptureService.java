@@ -29,22 +29,25 @@ public class ScreenCaptureService extends Service {
     public static final String ACTION_TOGGLE = "com.codybot.ACTION_TOGGLE";
     private static final String CHANNEL_ID = "CodyBotCaptureChannel";
 
-    private static MediaProjection mediaProjection;
+    private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
-    private Handler handler = new Handler(Looper.getMainLooper());
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean isCapturing = false;
 
     @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
+    public IBinder onBind(Intent intent) { return null; }
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        startForeground(101, createNotification());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(101, createNotification(),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+        } else {
+            startForeground(101, createNotification());
+        }
     }
 
     private void createNotificationChannel() {
@@ -57,31 +60,33 @@ public class ScreenCaptureService extends Service {
     }
 
     private Notification createNotification() {
-        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
-                new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
-        return builder.setContentTitle("CodyBot 3.0")
-                .setContentText("Servizio attivo")
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, CHANNEL_ID)
+                : new Notification.Builder(this);
+        return builder.setContentTitle("CodyBot 3.1")
+                .setContentText("Servizio cattura attivo")
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .build();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null) {
-            int resultCode = intent.getIntExtra("resultCode", 0);
-            Intent data = intent.getParcelableExtra("data");
+        if (intent == null) return START_STICKY;
 
-            if (resultCode != 0 && data != null) {
-                MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+        int resultCode = intent.getIntExtra("resultCode", 0);
+        Intent data = intent.getParcelableExtra("data");
+
+        if (resultCode != 0 && data != null) {
+            MediaProjectionManager projectionManager =
+                    (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+            if (projectionManager != null) {
                 mediaProjection = projectionManager.getMediaProjection(resultCode, data);
-                updateOverlayText("MediaProjection Attivo!");
-                return START_STICKY;
+                updateOverlayText("MediaProjection attivo");
             }
-
-            if (ACTION_TOGGLE.equals(intent.getAction())) {
-                toggleCapture();
-            }
+            return START_STICKY;
         }
+
+        if (ACTION_TOGGLE.equals(intent.getAction())) toggleCapture();
         return START_STICKY;
     }
 
@@ -89,19 +94,23 @@ public class ScreenCaptureService extends Service {
         if (isCapturing) {
             stopCapture();
             updateOverlayText("Cattura interrotta");
-        } else {
-            if (mediaProjection != null) {
-                startCapture();
-            } else {
-                Intent i = new Intent(this, MainActivity.class);
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(i);
-                updateOverlayText("Autorizza la cattura nell'app");
-            }
+            return;
         }
+
+        if (mediaProjection == null) {
+            Intent i = new Intent(this, MainActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+            updateOverlayText("Autorizza la cattura nell'app");
+            return;
+        }
+
+        startCapture();
     }
 
     private void startCapture() {
+        if (mediaProjection == null || isCapturing) return;
+
         isCapturing = true;
         updateOverlayText("SCAN in corso...");
 
@@ -109,23 +118,40 @@ public class ScreenCaptureService extends Service {
         DisplayMetrics metrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getMetrics(metrics);
 
-        imageReader = ImageReader.newInstance(metrics.widthPixels, metrics.heightPixels, PixelFormat.RGBA_8888, 2);
-        virtualDisplay = mediaProjection.createVirtualDisplay("CodyBotCapture",
-                metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
+        imageReader = ImageReader.newInstance(
+                metrics.widthPixels, metrics.heightPixels, PixelFormat.RGBA_8888, 2);
+
+        virtualDisplay = mediaProjection.createVirtualDisplay(
+                "CodyBotCapture",
+                metrics.widthPixels,
+                metrics.heightPixels,
+                metrics.densityDpi,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(), null, handler);
+                imageReader.getSurface(),
+                null,
+                handler);
 
         imageReader.setOnImageAvailableListener(reader -> {
             Image image = reader.acquireLatestImage();
             if (image != null) {
-                Bitmap bitmap = imageToBitmap(image);
-                image.close();
-                stopCapture();
-                if (bitmap != null) {
-                    processOCR(bitmap);
+                Bitmap bitmap = null;
+                try {
+                    bitmap = imageToBitmap(image);
+                } finally {
+                    image.close();
                 }
+                stopCapture();
+                if (bitmap != null) processOCR(bitmap);
             }
         }, handler);
+
+        // Never leave the UI stuck forever if Android does not deliver a frame.
+        handler.postDelayed(() -> {
+            if (isCapturing) {
+                stopCapture();
+                updateOverlayText("Timeout cattura: nessun frame ricevuto");
+            }
+        }, 5000);
     }
 
     private Bitmap imageToBitmap(Image image) {
@@ -137,29 +163,34 @@ public class ScreenCaptureService extends Service {
         int height = image.getHeight();
         int rowPadding = rowStride - pixelStride * width;
 
-        Bitmap bitmap = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
+        Bitmap bitmap = Bitmap.createBitmap(
+                width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
         bitmap.copyPixelsFromBuffer(buffer);
-        return Bitmap.createBitmap(bitmap, 0, 0, width, height);
+        Bitmap cropped = Bitmap.createBitmap(bitmap, 0, 0, width, height);
+        if (cropped != bitmap) bitmap.recycle();
+        return cropped;
     }
 
     private void processOCR(Bitmap bitmap) {
         InputImage inputImage = InputImage.fromBitmap(bitmap, 0);
-        TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+        TextRecognizer recognizer =
+                TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
 
         recognizer.process(inputImage)
                 .addOnSuccessListener(visionText -> {
                     String text = visionText.getText();
-                    if (text.isEmpty()) {
-                        updateOverlayText("Nessun testo rilevato");
-                    } else {
-                        updateOverlayText("OCR: " + text.replace("\n", " "));
-                    }
+                    updateOverlayText(text.isEmpty()
+                            ? "Nessun testo rilevato"
+                            : "OCR: " + text.replace("\n", " "));
                 })
-                .addOnFailureListener(e -> updateOverlayText("Errore OCR: " + e.getMessage()));
+                .addOnFailureListener(e ->
+                        updateOverlayText("Errore OCR: " + e.getMessage()))
+                .addOnCompleteListener(task -> recognizer.close());
     }
 
     private void updateOverlayText(String message) {
         Intent intent = new Intent("com.codybot.UPDATE_OVERLAY");
+        intent.setPackage(getPackageName());
         intent.putExtra("message", message);
         sendBroadcast(intent);
     }
@@ -170,5 +201,19 @@ public class ScreenCaptureService extends Service {
             virtualDisplay.release();
             virtualDisplay = null;
         }
+        if (imageReader != null) {
+            imageReader.close();
+            imageReader = null;
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        stopCapture();
+        if (mediaProjection != null) {
+            mediaProjection.stop();
+            mediaProjection = null;
+        }
+        super.onDestroy();
     }
 }
