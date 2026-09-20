@@ -8,11 +8,10 @@ android {
         applicationId 'com.codybot.app'
         minSdk 24
         targetSdk 30
-        versionCode 32
-        versionName '3.2'
+        versionCode 33
+        versionName '3.3'
     }
 
-    // Android 11 (API 30) rejects APKs whose resources.arsc is compressed.
     androidResources {
         noCompress 'arsc'
     }
