@@ -128,8 +128,11 @@ public class ScreenCaptureService extends Service {
             try { bitmap = imageToBitmap(image); }
             finally { image.close(); }
             stopCapture();
-            if (bitmap != null) processOCR(cropClue(bitmap));
-            if (bitmap != null && bitmap != cropClue(bitmap)) bitmap.recycle();
+            if (bitmap != null) {
+                Bitmap clueBitmap = cropClue(bitmap);
+                if (clueBitmap != bitmap) bitmap.recycle();
+                processOCR(clueBitmap);
+            }
         }, handler);
 
         handler.postDelayed(() -> {
@@ -140,11 +143,7 @@ public class ScreenCaptureService extends Service {
         }, 5000);
     }
 
-    /**
-     * CodyCross places the clue in the lower-middle part of the screen,
-     * above the keyboard. We OCR only this band so counters, grid letters,
-     * buttons and the keyboard cannot pollute the clue text.
-     */
+    /** CodyCross clue band: lower-middle area, directly above the keyboard. */
     private Bitmap cropClue(Bitmap source) {
         int w = source.getWidth();
         int h = source.getHeight();
