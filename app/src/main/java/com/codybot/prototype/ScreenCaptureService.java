@@ -24,6 +24,8 @@ import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ScreenCaptureService extends Service {
     public static final String ACTION_TOGGLE = "com.codybot.ACTION_TOGGLE";
@@ -33,10 +35,10 @@ public class ScreenCaptureService extends Service {
     private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
     private boolean isCapturing = false;
 
-    @Override
-    public IBinder onBind(Intent intent) { return null; }
+    @Override public IBinder onBind(Intent intent) { return null; }
 
     @Override
     public void onCreate() {
@@ -72,10 +74,8 @@ public class ScreenCaptureService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) return START_STICKY;
-
         int resultCode = intent.getIntExtra("resultCode", 0);
         Intent data = intent.getParcelableExtra("data");
-
         if (resultCode != 0 && data != null) {
             MediaProjectionManager projectionManager =
                     (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
@@ -85,7 +85,6 @@ public class ScreenCaptureService extends Service {
             }
             return START_STICKY;
         }
-
         if (ACTION_TOGGLE.equals(intent.getAction())) toggleCapture();
         return START_STICKY;
     }
@@ -96,7 +95,6 @@ public class ScreenCaptureService extends Service {
             updateOverlayText("Cattura interrotta");
             return;
         }
-
         if (mediaProjection == null) {
             Intent i = new Intent(this, MainActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -104,15 +102,13 @@ public class ScreenCaptureService extends Service {
             updateOverlayText("Autorizza la cattura nell'app");
             return;
         }
-
         startCapture();
     }
 
     private void startCapture() {
         if (mediaProjection == null || isCapturing) return;
-
         isCapturing = true;
-        updateOverlayText("SCAN in corso...");
+        updateOverlayText("SCAN: cattura in corso...");
 
         WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         DisplayMetrics metrics = new DisplayMetrics();
@@ -120,38 +116,44 @@ public class ScreenCaptureService extends Service {
 
         imageReader = ImageReader.newInstance(
                 metrics.widthPixels, metrics.heightPixels, PixelFormat.RGBA_8888, 2);
-
         virtualDisplay = mediaProjection.createVirtualDisplay(
-                "CodyBotCapture",
-                metrics.widthPixels,
-                metrics.heightPixels,
-                metrics.densityDpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(),
-                null,
-                handler);
+                "CodyBotCapture", metrics.widthPixels, metrics.heightPixels,
+                metrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader.getSurface(), null, handler);
 
         imageReader.setOnImageAvailableListener(reader -> {
             Image image = reader.acquireLatestImage();
-            if (image != null) {
-                Bitmap bitmap = null;
-                try {
-                    bitmap = imageToBitmap(image);
-                } finally {
-                    image.close();
-                }
-                stopCapture();
-                if (bitmap != null) processOCR(bitmap);
-            }
+            if (image == null) return;
+            Bitmap bitmap = null;
+            try { bitmap = imageToBitmap(image); }
+            finally { image.close(); }
+            stopCapture();
+            if (bitmap != null) processOCR(cropClue(bitmap));
+            if (bitmap != null && bitmap != cropClue(bitmap)) bitmap.recycle();
         }, handler);
 
-        // Never leave the UI stuck forever if Android does not deliver a frame.
         handler.postDelayed(() -> {
             if (isCapturing) {
                 stopCapture();
                 updateOverlayText("Timeout cattura: nessun frame ricevuto");
             }
         }, 5000);
+    }
+
+    /**
+     * CodyCross places the clue in the lower-middle part of the screen,
+     * above the keyboard. We OCR only this band so counters, grid letters,
+     * buttons and the keyboard cannot pollute the clue text.
+     */
+    private Bitmap cropClue(Bitmap source) {
+        int w = source.getWidth();
+        int h = source.getHeight();
+        int left = Math.max(0, Math.round(w * 0.05f));
+        int top = Math.max(0, Math.round(h * 0.62f));
+        int right = Math.min(w, Math.round(w * 0.95f));
+        int bottom = Math.min(h, Math.round(h * 0.73f));
+        if (right <= left || bottom <= top) return source;
+        return Bitmap.createBitmap(source, left, top, right - left, bottom - top);
     }
 
     private Bitmap imageToBitmap(Image image) {
@@ -162,7 +164,6 @@ public class ScreenCaptureService extends Service {
         int width = image.getWidth();
         int height = image.getHeight();
         int rowPadding = rowStride - pixelStride * width;
-
         Bitmap bitmap = Bitmap.createBitmap(
                 width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
         bitmap.copyPixelsFromBuffer(buffer);
@@ -171,21 +172,33 @@ public class ScreenCaptureService extends Service {
         return cropped;
     }
 
-    private void processOCR(Bitmap bitmap) {
-        InputImage inputImage = InputImage.fromBitmap(bitmap, 0);
-        TextRecognizer recognizer =
-                TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
-
+    private void processOCR(Bitmap clueBitmap) {
+        InputImage inputImage = InputImage.fromBitmap(clueBitmap, 0);
+        TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
         recognizer.process(inputImage)
                 .addOnSuccessListener(visionText -> {
-                    String text = visionText.getText();
-                    updateOverlayText(text.isEmpty()
-                            ? "Nessun testo rilevato"
-                            : "OCR: " + text.replace("\n", " "));
+                    String clue = visionText.getText().replace("\n", " ").trim();
+                    if (clue.isEmpty()) {
+                        updateOverlayText("OCR: nessun indizio rilevato");
+                        return;
+                    }
+                    updateOverlayText("INDIZIO: " + clue);
+                    resolverExecutor.execute(() -> {
+                        String answer = AnswerResolver.resolve(clue);
+                        handler.post(() -> {
+                            if (answer == null || answer.trim().isEmpty()) {
+                                updateOverlayText("INDIZIO: " + clue + "\nRISPOSTA: non trovata");
+                            } else {
+                                updateOverlayText("INDIZIO: " + clue + "\nRISPOSTA: " + answer);
+                            }
+                        });
+                    });
                 })
-                .addOnFailureListener(e ->
-                        updateOverlayText("Errore OCR: " + e.getMessage()))
-                .addOnCompleteListener(task -> recognizer.close());
+                .addOnFailureListener(e -> updateOverlayText("Errore OCR: " + e.getMessage()))
+                .addOnCompleteListener(task -> {
+                    recognizer.close();
+                    clueBitmap.recycle();
+                });
     }
 
     private void updateOverlayText(String message) {
@@ -197,23 +210,15 @@ public class ScreenCaptureService extends Service {
 
     private void stopCapture() {
         isCapturing = false;
-        if (virtualDisplay != null) {
-            virtualDisplay.release();
-            virtualDisplay = null;
-        }
-        if (imageReader != null) {
-            imageReader.close();
-            imageReader = null;
-        }
+        if (virtualDisplay != null) { virtualDisplay.release(); virtualDisplay = null; }
+        if (imageReader != null) { imageReader.close(); imageReader = null; }
     }
 
     @Override
     public void onDestroy() {
         stopCapture();
-        if (mediaProjection != null) {
-            mediaProjection.stop();
-            mediaProjection = null;
-        }
+        resolverExecutor.shutdownNow();
+        if (mediaProjection != null) { mediaProjection.stop(); mediaProjection = null; }
         super.onDestroy();
     }
 }
