@@ -1,4 +1,4 @@
-name: Build CodyBot 3.1 APK
+name: Build CodyBot 3.2 APK
 on:
   workflow_dispatch:
   push:
@@ -31,10 +31,9 @@ jobs:
           with zipfile.ZipFile(apk) as z:
               info=z.getinfo('resources.arsc')
               print('resources.arsc compress_type =', info.compress_type)
-              print('resources.arsc header_offset =', info.header_offset)
               assert info.compress_type == zipfile.ZIP_STORED, 'resources.arsc is compressed'
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: CodyBot-3.1-debug-apk
+          name: CodyBot-3.2-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
