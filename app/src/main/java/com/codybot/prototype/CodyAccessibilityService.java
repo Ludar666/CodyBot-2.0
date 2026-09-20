@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
@@ -24,11 +25,8 @@ public class CodyAccessibilityService extends AccessibilityService {
     private final BroadcastReceiver overlayReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent != null && intent.hasExtra("message")) {
-                String msg = intent.getStringExtra("message");
-                if (statusText != null) {
-                    statusText.setText(msg);
-                }
+            if (intent != null && intent.hasExtra("message") && statusText != null) {
+                statusText.setText(intent.getStringExtra("message"));
             }
         }
     };
@@ -50,13 +48,13 @@ public class CodyAccessibilityService extends AccessibilityService {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.HORIZONTAL);
         layout.setBackgroundColor(Color.parseColor("#CC000000"));
-        layout.setPadding(32, 16, 32, 16);
+        layout.setPadding(24, 12, 24, 12);
 
         statusText = new TextView(this);
         statusText.setText("CodyBot 3.1 Pronto");
         statusText.setTextColor(Color.WHITE);
         statusText.setTextSize(14);
-        statusText.setPadding(0, 0, 24, 0);
+        statusText.setPadding(0, 0, 16, 0);
 
         toggleButton = new Button(this);
         toggleButton.setText("START / STOP");
@@ -64,7 +62,15 @@ public class CodyAccessibilityService extends AccessibilityService {
         toggleButton.setOnClickListener(v -> {
             Intent intent = new Intent(this, ScreenCaptureService.class);
             intent.setAction(ScreenCaptureService.ACTION_TOGGLE);
-            startService(intent);
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent);
+                } else {
+                    startService(intent);
+                }
+            } catch (Exception e) {
+                if (statusText != null) statusText.setText("Errore avvio cattura: " + e.getClass().getSimpleName());
+            }
         });
 
         layout.addView(statusText);
@@ -77,7 +83,6 @@ public class CodyAccessibilityService extends AccessibilityService {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
-
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         params.y = 100;
 
@@ -88,22 +93,15 @@ public class CodyAccessibilityService extends AccessibilityService {
         }
     }
 
-    @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {}
-
-    @Override
-    public void onInterrupt() {}
+    @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
+    @Override public void onInterrupt() {}
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        try {
-            unregisterReceiver(overlayReceiver);
-        } catch (Exception ignored) {}
+        try { unregisterReceiver(overlayReceiver); } catch (Exception ignored) {}
         if (overlayView != null && windowManager != null) {
-            try {
-                windowManager.removeView(overlayView);
-            } catch (Exception ignored) {}
+            try { windowManager.removeView(overlayView); } catch (Exception ignored) {}
         }
     }
 }
