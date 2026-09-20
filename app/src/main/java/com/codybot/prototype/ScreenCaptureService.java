@@ -60,7 +60,7 @@ public class ScreenCaptureService extends Service {
     private Notification createNotification() {
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
-        return builder.setContentTitle("CodyBot 3.2")
+        return builder.setContentTitle("CodyBot 3.3")
                 .setContentText("Servizio cattura attivo")
                 .setSmallIcon(android.R.drawable.ic_menu_camera).build();
     }
@@ -103,7 +103,7 @@ public class ScreenCaptureService extends Service {
         updateOverlayText("SCAN: cattura in corso...");
         WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         DisplayMetrics metrics = new DisplayMetrics();
-        windowManager.getDefaultDisplay().getMetrics(metrics);
+        windowManager.getDefaultDisplay().getRealMetrics(metrics);
         imageReader = ImageReader.newInstance(metrics.widthPixels, metrics.heightPixels, PixelFormat.RGBA_8888, 2);
         virtualDisplay = mediaProjection.createVirtualDisplay("CodyBotCapture", metrics.widthPixels, metrics.heightPixels,
                 metrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, imageReader.getSurface(), null, handler);
@@ -115,9 +115,10 @@ public class ScreenCaptureService extends Service {
             try { bitmap = imageToBitmap(image); } finally { image.close(); }
             stopCapture();
             if (bitmap != null) {
+                int expectedLength = detectAnswerLength(bitmap);
                 Bitmap clueBitmap = cropClue(bitmap);
                 if (clueBitmap != bitmap) bitmap.recycle();
-                processOCR(clueBitmap);
+                processOCR(clueBitmap, expectedLength);
             }
         }, handler);
 
@@ -127,6 +128,32 @@ public class ScreenCaptureService extends Service {
                 updateOverlayText("Timeout cattura: nessun frame ricevuto");
             }
         }, 5000);
+    }
+
+    private int detectAnswerLength(Bitmap source) {
+        int w = source.getWidth(), h = source.getHeight();
+        int bestY = -1, bestYellow = 0;
+        for (int y = Math.round(h * 0.15f); y < Math.round(h * 0.65f); y += 4) {
+            int yellow = 0;
+            for (int x = Math.round(w * 0.02f); x < Math.round(w * 0.98f); x += 4) {
+                int p = source.getPixel(x, y);
+                int r = (p >> 16) & 255, g = (p >> 8) & 255, b = p & 255;
+                if (r > 190 && g > 120 && g < 220 && b < 120 && r > g + 35) yellow++;
+            }
+            if (yellow > bestYellow) { bestYellow = yellow; bestY = y; }
+        }
+        if (bestY < 0) return 0;
+        int runs = 0; boolean inCell = false; int start = 0;
+        int minRun = Math.max(20, w / 30);
+        for (int x = 0; x < w; x += 2) {
+            int p = source.getPixel(x, bestY);
+            int r = (p >> 16) & 255, g = (p >> 8) & 255, b = p & 255;
+            boolean lightCell = r > 170 && g > 145 && b > 125;
+            if (lightCell && !inCell) { inCell = true; start = x; }
+            if (!lightCell && inCell) { if (x - start >= minRun) runs++; inCell = false; }
+        }
+        if (inCell && w - start >= minRun) runs++;
+        return runs >= 2 && runs <= 15 ? runs : 0;
     }
 
     private Bitmap cropClue(Bitmap source) {
@@ -152,25 +179,21 @@ public class ScreenCaptureService extends Service {
         return cropped;
     }
 
-    private void processOCR(Bitmap clueBitmap) {
+    private void processOCR(Bitmap clueBitmap, int expectedLength) {
         InputImage inputImage = InputImage.fromBitmap(clueBitmap, 0);
         TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
         recognizer.process(inputImage)
                 .addOnSuccessListener(visionText -> {
                     String clue = visionText.getText().replace("\n", " ").trim();
-                    if (clue.isEmpty()) {
-                        updateOverlayText("OCR: nessun indizio rilevato");
-                        return;
-                    }
-                    updateOverlayText("INDIZIO: " + clue);
+                    if (clue.isEmpty()) { updateOverlayText("OCR: nessun indizio rilevato"); return; }
+                    updateOverlayText("INDIZIO (" + (expectedLength > 0 ? expectedLength : "?") + "): " + clue);
                     resolverExecutor.execute(() -> {
-                        String answer = AnswerResolver.resolve(clue);
+                        String answer = AnswerResolver.resolve(clue, expectedLength);
                         handler.post(() -> {
                             if (answer == null || answer.trim().isEmpty()) {
                                 updateOverlayText("INDIZIO: " + clue + "\nRISPOSTA: non trovata");
                             } else {
                                 updateOverlayText("INDIZIO: " + clue + "\nRISPOSTA: " + answer);
-                                // The accessibility service performs the actual key taps.
                                 Intent fill = new Intent("com.codybot.FILL_ANSWER");
                                 fill.setPackage(getPackageName());
                                 fill.putExtra("answer", answer);
@@ -180,10 +203,7 @@ public class ScreenCaptureService extends Service {
                     });
                 })
                 .addOnFailureListener(e -> updateOverlayText("Errore OCR: " + e.getMessage()))
-                .addOnCompleteListener(task -> {
-                    recognizer.close();
-                    if (!clueBitmap.isRecycled()) clueBitmap.recycle();
-                });
+                .addOnCompleteListener(task -> { recognizer.close(); if (!clueBitmap.isRecycled()) clueBitmap.recycle(); });
     }
 
     private void updateOverlayText(String message) {
