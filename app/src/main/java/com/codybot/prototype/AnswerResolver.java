@@ -5,6 +5,7 @@ import org.json.JSONObject;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
+import java.util.Iterator;
 
 public class AnswerResolver {
     private static JSONObject localDb = null;
@@ -26,15 +27,22 @@ public class AnswerResolver {
 
     public static String normalizeText(String text) {
         if (text == null) return "";
-        String clean = text.toLowerCase().replaceAll("[^a-z0-9àèéìòùáéíóú\\s]", " ").replaceAll("\\s+", " ").trim();
-        return Normalizer.normalize(clean, Normalizer.Form.NFD).replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        String clean = text.toLowerCase()
+                .replaceAll("[^a-z0-9àèéìòùáéíóú\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return Normalizer.normalize(clean, Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
     }
 
     public static String resolve(Context context, String clue, int expectedLength) {
+        if (clue == null || clue.trim().isEmpty()) {
+            return "Nessun indizio letto";
+        }
+
         init(context);
         String cleanClue = normalizeText(clue);
-        
-        // 1. Ricerca esatta nel database locale JSON
+
         if (localDb != null && localDb.has(cleanClue)) {
             try {
                 String ans = localDb.getString(cleanClue).toUpperCase().trim();
@@ -44,10 +52,9 @@ public class AnswerResolver {
             } catch (Exception ignored) {}
         }
 
-        // 2. Ricerca per contenimento chiavi se l'OCR ha preso qualche parola extra
         if (localDb != null) {
             try {
-                java.util.Iterator<String> keys = localDb.keys();
+                Iterator<String> keys = localDb.keys();
                 while (keys.hasNext()) {
                     String key = keys.next();
                     if (cleanClue.contains(key) || key.contains(cleanClue)) {
@@ -60,6 +67,6 @@ public class AnswerResolver {
             } catch (Exception ignored) {}
         }
 
-        return null;
+        return "Non in archivio (" + (expectedLength > 0 ? expectedLength + " lettere" : "?") + ")";
     }
 }
