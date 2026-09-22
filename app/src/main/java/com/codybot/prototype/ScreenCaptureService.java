@@ -172,10 +172,10 @@ public class ScreenCaptureService extends Service {
      */
     private Bitmap cropClue(Bitmap source) {
         int w = source.getWidth(), h = source.getHeight();
-        int left = Math.max(0, Math.round(w * 0.02f));
-        int top = Math.max(0, Math.round(h * 0.55f));
-        int right = Math.min(w, Math.round(w * 0.98f));
-        int bottom = Math.min(h, Math.round(h * 0.73f));
+        int left = Math.max(0, Math.round(w * 0.04f));
+        int top = Math.max(0, Math.round(h * 0.61f));
+        int right = Math.min(w, Math.round(w * 0.96f));
+        int bottom = Math.min(h, Math.round(h * 0.71f));
         if (right <= left || bottom <= top) return source;
         return Bitmap.createBitmap(source, left, top, right - left, bottom - top);
     }
