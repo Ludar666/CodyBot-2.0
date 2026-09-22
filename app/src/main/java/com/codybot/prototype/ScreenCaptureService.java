@@ -219,7 +219,7 @@ public class ScreenCaptureService extends Service {
                     } else lastResolveAt = now;
 
                     resolverExecutor.execute(() -> {
-                        String answer = AnswerResolver.resolve(clue, expectedLength);
+                        String answer = AnswerResolver.resolve(this, clue, expectedLength);
                         handler.post(() -> {
                             if (!isCapturing) return;
                             if (answer == null || answer.trim().isEmpty()) {
