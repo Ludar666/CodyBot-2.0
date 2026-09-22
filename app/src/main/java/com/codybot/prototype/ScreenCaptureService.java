@@ -175,7 +175,7 @@ public class ScreenCaptureService extends Service {
         int left = Math.max(0, Math.round(w * 0.04f));
         int top = Math.max(0, Math.round(h * 0.61f));
         int right = Math.min(w, Math.round(w * 0.96f));
-        int bottom = Math.min(h, Math.round(h * 0.71f));
+        int bottom = Math.min(h, Math.round(h * 0.67f));
         if (right <= left || bottom <= top) return source;
         return Bitmap.createBitmap(source, left, top, right - left, bottom - top);
     }
