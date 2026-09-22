@@ -9,8 +9,6 @@ import android.util.Log;
 public class ScreenCaptureService extends Service {
     private static final String TAG = "CodyBot";
     public static final String ACTION_TOGGLE = "com.codybot.prototype.ACTION_TOGGLE";
-    
-    private boolean isProcessing = false;
 
     @Override
     public IBinder onBind(Intent intent) {
