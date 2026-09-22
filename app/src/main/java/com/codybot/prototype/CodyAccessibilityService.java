@@ -1,4 +1,5 @@
 package com.codybot.app;
+import com.codybot.prototype.ScreenCaptureService;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.BroadcastReceiver;

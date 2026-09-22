@@ -1,4 +1,5 @@
 package com.codybot.app;
+import com.codybot.prototype.ScreenCaptureService;
 
 import android.app.Activity;
 import android.content.Context;
