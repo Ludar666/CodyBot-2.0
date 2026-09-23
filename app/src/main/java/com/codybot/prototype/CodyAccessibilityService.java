@@ -250,7 +250,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         calibrationIndex = 0;
         calibrationInProgress = true;
 
-        final FrameLayoutCompat frame = new FrameLayoutCompat(this);
+        final android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
         frame.setBackgroundColor(Color.TRANSPARENT);
         frame.setClickable(true);
         frame.setFocusable(false);
