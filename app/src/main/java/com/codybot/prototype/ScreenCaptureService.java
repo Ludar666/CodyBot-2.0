@@ -114,6 +114,17 @@ public class ScreenCaptureService extends Service {
     private void startScanning(){
         if(projection==null || running) return;
         try{
+            // STOP mette in pausa la scansione ma mantiene la sessione MediaProjection.
+            // In ripresa riutilizziamo ImageReader e VirtualDisplay esistenti:
+            // crearne un secondo con lo stesso token può terminare la cattura su Android recenti.
+            if (reader != null && display != null) {
+                running = true;
+                lastScan = 0;
+                lastClue = "";
+                broadcast("🟢 SCANSIONE ATTIVA\\nIn attesa dell'indizio...","");
+                return;
+            }
+
             DisplayMetrics dm=getResources().getDisplayMetrics();
             int w=dm.widthPixels,h=dm.heightPixels;
 
