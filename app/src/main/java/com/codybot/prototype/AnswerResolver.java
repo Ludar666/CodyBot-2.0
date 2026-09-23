@@ -35,6 +35,7 @@ public class AnswerResolver {
     public static String normalizeText(String text) {
         if (text == null) return "";
         String clean = text.toLowerCase()
+                .replaceAll("(?<=[a-zàèéìòùáéíóú])0(?=[a-zàèéìòùáéíóú])", "o")
                 .replaceAll("[^a-z0-9àèéìòùáéíóú\\s]", " ")
                 .replaceAll("\\s+", " ").trim();
         return Normalizer.normalize(clean, Normalizer.Form.NFD)
