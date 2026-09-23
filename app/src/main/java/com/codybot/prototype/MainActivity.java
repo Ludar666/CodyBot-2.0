@@ -109,7 +109,7 @@ public class MainActivity extends Activity {
                     } else if (which == 3) {
                         importKeyboardCalibration();
                     } else if (which == 4) {
-                        chooseSchemaLength("CALIBRAZIONE SCHEMA", "CALIBRATE_SCHEMA");
+                        chooseMultiRowSchemaLength();
                     } else if (which == 5) {
                         chooseSchemaLength("TEST SCHEMA", "TEST_SCHEMA");
                     } else if (which == 6) {
@@ -120,6 +120,23 @@ public class MainActivity extends Activity {
                     } else if (which == 7) {
                         importSchemaCalibration();
                     }
+                })
+                .show();
+    }
+
+    private void chooseMultiRowSchemaLength() {
+        final String[] lengths = new String[18];
+        for (int i = 0; i < lengths.length; i++) lengths[i] = String.valueOf(i + 3);
+        new AlertDialog.Builder(this)
+                .setTitle("CALIBRAZIONE SCHEMA - lettere per parola")
+                .setMessage("Scegli quante caselle ha ogni parola. Il numero di parole verrà acquisito automaticamente durante la calibrazione.")
+                .setItems(lengths, (dialog, which) -> {
+                    int length = which + 3;
+                    Intent intent = new Intent(this, SchemaCalibrationService.class);
+                    intent.setAction(SchemaCalibrationService.ACTION_START);
+                    intent.putExtra(SchemaCalibrationService.EXTRA_LENGTH, length);
+                    startService(intent);
+                    status.setText("📐 CALIBRAZIONE SCHEMA AVVIATA\n\n" + length + " lettere per parola.\nIl numero di parole è variabile.");
                 })
                 .show();
     }
@@ -184,9 +201,7 @@ public class MainActivity extends Activity {
 
     private void chooseSchemaLength(String title, String action) {
         final String[] lengths = new String[18];
-        for (int i = 0; i < lengths.length; i++) {
-            lengths[i] = String.valueOf(i + 3);
-        }
+        for (int i = 0; i < lengths.length; i++) lengths[i] = String.valueOf(i + 3);
         new AlertDialog.Builder(this)
                 .setTitle(title + " - numero lettere")
                 .setItems(lengths, (dialog, which) -> {
@@ -201,93 +216,43 @@ public class MainActivity extends Activity {
     }
 
     private void exportCalibration() {
-        String raw = getSharedPreferences("codybot_keyboard", MODE_PRIVATE)
-                .getString("centers", null);
+        String raw = getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getString("centers", null);
         if (raw == null || raw.trim().isEmpty()) {
-            new AlertDialog.Builder(this)
-                    .setTitle("Esporta calibrazione")
-                    .setMessage("Nessuna calibrazione salvata. Esegui prima CALIBRA TASTIERA.")
-                    .setPositiveButton("OK", null)
-                    .show();
+            new AlertDialog.Builder(this).setTitle("Esporta calibrazione").setMessage("Nessuna calibrazione salvata. Esegui prima CALIBRA TASTIERA.").setPositiveButton("OK", null).show();
             return;
         }
-
         String[] parts = raw.split(",");
         if (parts.length != 52) {
-            new AlertDialog.Builder(this)
-                    .setTitle("Esporta calibrazione")
-                    .setMessage("La calibrazione salvata non è valida.")
-                    .setPositiveButton("OK", null)
-                    .show();
+            new AlertDialog.Builder(this).setTitle("Esporta calibrazione").setMessage("La calibrazione salvata non è valida.").setPositiveButton("OK", null).show();
             return;
         }
-
         StringBuilder sb = new StringBuilder();
         sb.append("CodyBot - Calibrazione tastiera\n");
-        sb.append("Schermo: ")
-                .append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("width", 0))
-                .append(" x ")
-                .append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("height", 0))
-                .append("\n\n");
-
+        sb.append("Schermo: ").append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("width", 0)).append(" x ").append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("height", 0)).append("\n\n");
         String letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        for (int i = 0; i < 26; i++) {
-            sb.append(letters.charAt(i))
-                    .append(" = ")
-                    .append(Math.round(Float.parseFloat(parts[i * 2])))
-                    .append(", ")
-                    .append(Math.round(Float.parseFloat(parts[i * 2 + 1])))
-                    .append("\n");
-        }
-
+        for (int i = 0; i < 26; i++) sb.append(letters.charAt(i)).append(" = ").append(Math.round(Float.parseFloat(parts[i * 2]))).append(", ").append(Math.round(Float.parseFloat(parts[i * 2 + 1]))).append("\n");
         final String exportText = sb.toString();
-
-        new AlertDialog.Builder(this)
-                .setTitle("Calibrazione salvata")
-                .setMessage(exportText)
-                .setPositiveButton("COPIA", (d, w) -> {
-                    ClipboardManager clipboard =
-                            (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    clipboard.setPrimaryClip(ClipData.newPlainText("CodyBot calibrazione", exportText));
-                    status.setText("✅ COORDINATE COPIATE NEGLI APPUNTI");
-                })
-                .setNegativeButton("CHIUDI", null)
-                .show();
+        new AlertDialog.Builder(this).setTitle("Calibrazione salvata").setMessage(exportText).setPositiveButton("COPIA", (d, w) -> { ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE); cb.setPrimaryClip(ClipData.newPlainText("CodyBot calibrazione",exportText)); status.setText("✅ COORDINATE COPIATE NEGLI APPUNTI"); }).setNegativeButton("CHIUDI", null).show();
     }
 
     private void openOverlaySettings() {
         try {
-            if (!Settings.canDrawOverlays(this)) {
-                Intent intent = new Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:" + getPackageName()));
-                startActivity(intent);
-            }
-        } catch (Exception e) {
-            startActivity(new Intent(Settings.ACTION_SETTINGS));
-        }
+            if (!Settings.canDrawOverlays(this)) startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) { startActivity(new Intent(Settings.ACTION_SETTINGS)); }
     }
 
     private boolean isAccessibilityEnabled() {
-        String enabled = Settings.Secure.getString(
-                getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         if (enabled == null) return false;
-        String expected = new ComponentName(this,
-                CodyAccessibilityService.class).flattenToString();
+        String expected = new ComponentName(this, CodyAccessibilityService.class).flattenToString();
         return enabled.contains(expected);
     }
 
     private void refreshStatus() {
         boolean overlay = Settings.canDrawOverlays(this);
         boolean accessibility = isAccessibilityEnabled();
-        status.setText("Sovrapposizione: " + (overlay ? "ATTIVA ✓" : "NON ATTIVA ✗")
-                + "\nAccessibilità: " + (accessibility ? "ATTIVA ✓" : "NON ATTIVA ✗")
-                + "\n\nPer vedere CodyBot sopra CodyCross devono essere attive ENTRAMBE.");
+        status.setText("Sovrapposizione: " + (overlay ? "ATTIVA ✓" : "NON ATTIVA ✗") + "\nAccessibilità: " + (accessibility ? "ATTIVA ✓" : "NON ATTIVA ✗") + "\n\nPer vedere CodyBot sopra CodyCross devono essere attive ENTRAMBE.");
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (status != null) refreshStatus();
-    }
+    @Override protected void onResume() { super.onResume(); if (status != null) refreshStatus(); }
 }
