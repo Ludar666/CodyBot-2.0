@@ -131,9 +131,12 @@ public class CodyAccessibilityService extends AccessibilityService {
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
+        // Layout verticale: il testo dell'indizio/risposta deve avere spazio
+        // sufficiente. Nella vecchia versione orizzontale i tre pulsanti
+        // restringevano troppo il TextView e le informazioni sparivano/tagliavano.
         LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.HORIZONTAL);
-        layout.setGravity(Gravity.CENTER_VERTICAL);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(Gravity.CENTER_HORIZONTAL);
         layout.setBackgroundColor(Color.parseColor("#CC000000"));
         layout.setPadding(18, 8, 18, 8);
 
@@ -141,9 +144,17 @@ public class CodyAccessibilityService extends AccessibilityService {
         statusText.setText("CodyBot 3.1 PRONTO");
         statusText.setTextColor(Color.WHITE);
         statusText.setTextSize(14);
-        statusText.setPadding(0, 0, 12, 0);
+        statusText.setGravity(Gravity.CENTER);
+        statusText.setMaxLines(4);
+        statusText.setPadding(4, 0, 4, 4);
         layout.addView(statusText,
-                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setGravity(Gravity.CENTER);
 
         startButton = new Button(this);
         startButton.setText("START");
@@ -181,9 +192,13 @@ public class CodyAccessibilityService extends AccessibilityService {
             }
         });
 
-        layout.addView(startButton);
-        layout.addView(keyboardTestButton);
-        layout.addView(stopButton);
+        buttons.addView(startButton);
+        buttons.addView(keyboardTestButton);
+        buttons.addView(stopButton);
+        layout.addView(buttons,
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
         overlayView = layout;
 
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
@@ -253,7 +268,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         if (clean.isEmpty()) return;
 
         compiling = true;
-        if (statusText != null) statusText.setText("🟡 COMPILAZIONE: " + clean);
+        if (statusText != null) statusText.setText("🟢 INDIZIO/COMPILAZIONE\nRISPOSTA: " + clean);
 
         // Prima proviamo a calibrare la tastiera dalla schermata reale.
         // Se il dispositivo non supporta takeScreenshot(), usiamo il fallback.
@@ -322,7 +337,7 @@ public class CodyAccessibilityService extends AccessibilityService {
             if (!compiling) return;
             compiling = false;
             pendingCompilation.clear();
-            updateOverlayText("COMPILATA: " + clean);
+            updateOverlayText("✅ COMPILATA: " + clean);
             calibratedCenters = null;
         };
         pendingCompilation.add(finishRunnable);
