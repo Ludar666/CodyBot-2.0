@@ -107,7 +107,25 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    private void chooseSchemaLength(String title, String action) {\n        final String[] lengths = new String[18];\n        for (int i = 0; i < lengths.length; i++) lengths[i] = String.valueOf(i + 3);\n        new AlertDialog.Builder(this).setTitle(title + " - numero lettere").setItems(lengths, (dialog, which) -> {\n            int length = which + 3;\n            Intent intent = new Intent("com.codybot." + action);\n            intent.setPackage(getPackageName());\n            intent.putExtra("length", length);\n            sendBroadcast(intent);\n            status.setText(title + " avviata\\n\\nSchema da " + length + " lettere.");\n        }).show();\n    }\n\n    private void exportCalibration() {
+    private void chooseSchemaLength(String title, String action) {
+        final String[] lengths = new String[18];
+        for (int i = 0; i < lengths.length; i++) {
+            lengths[i] = String.valueOf(i + 3);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(title + " - numero lettere")
+                .setItems(lengths, (dialog, which) -> {
+                    int length = which + 3;
+                    Intent intent = new Intent("com.codybot." + action);
+                    intent.setPackage(getPackageName());
+                    intent.putExtra("length", length);
+                    sendBroadcast(intent);
+                    status.setText(title + " avviata\\n\\nSchema da " + length + " lettere.");
+                })
+                .show();
+    }
+
+    private void exportCalibration() {
         String raw = getSharedPreferences("codybot_keyboard", MODE_PRIVATE)
                 .getString("centers", null);
         if (raw == null || raw.trim().isEmpty()) {
