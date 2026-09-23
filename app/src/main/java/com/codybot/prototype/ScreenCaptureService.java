@@ -21,6 +21,7 @@ import java.util.ArrayList;
 
 public class ScreenCaptureService extends Service {
     public static final String ACTION_TOGGLE="com.codybot.prototype.ACTION_TOGGLE";
+    public static final String ACTION_START_SCAN="com.codybot.prototype.ACTION_START_SCAN";
     public static final String ACTION_START_CAPTURE="com.codybot.prototype.ACTION_START_CAPTURE";
     public static final String ACTION_STOP_CAPTURE="com.codybot.prototype.ACTION_STOP_CAPTURE";
     public static final String ACTION_PAUSE_CAPTURE="com.codybot.prototype.ACTION_PAUSE_CAPTURE";
@@ -46,7 +47,17 @@ public class ScreenCaptureService extends Service {
     @Override public int onStartCommand(Intent i,int flags,int id){
         if(i==null) return START_STICKY;
         String a=i.getAction();
-        if(ACTION_TOGGLE.equals(a)){
+        if(ACTION_START_SCAN.equals(a)){
+            if (running) {
+                updateStatus();
+            } else if (projection != null && reader != null && display != null) {
+                startScanning();
+                updateStatus();
+            } else {
+                requestProjection();
+            }
+        }
+        else if(ACTION_TOGGLE.equals(a)){
             if(running) {
                 // STOP = pausa: manteniamo la stessa sessione MediaProjection.
                 // Cosi' START successivo non richiede di nuovo il consenso.
