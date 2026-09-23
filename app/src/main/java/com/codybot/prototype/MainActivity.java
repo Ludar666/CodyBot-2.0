@@ -12,8 +12,10 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.text.InputType;
 
 public class MainActivity extends Activity {
 
@@ -98,10 +100,10 @@ public class MainActivity extends Activity {
                         sendBroadcast(intent);
                         status.setText("CALIBRAZIONE AVVIATA\n\nTocca A-Z sulla tastiera CodyCross.");
                     } else if (which == 1) {
-                        Intent testIntent = new Intent("com.codybot.TEST_KEYBOARD");
+                        Intent testIntent = new Intent("com.codybot.ARM_TEST_KEYBOARD");
                         testIntent.setPackage(getPackageName());
                         sendBroadcast(testIntent);
-                        status.setText("TEST TASTIERA AVVIATO\n\nCodyBot proverà a digitare A-Z.");
+                        status.setText("🧪 TEST TASTIERA PRONTO\n\nPassa ora a CodyCross.\nIl test A-Z partirà automaticamente quando CodyCross diventa l'app in primo piano.");
                     } else if (which == 2) {
                         exportCalibration();
                     } else if (which == 3) {
@@ -124,21 +126,63 @@ public class MainActivity extends Activity {
 
     private void importKeyboardCalibration() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (clipboard == null || !clipboard.hasPrimaryClip()) { new AlertDialog.Builder(this).setTitle("Importa calibrazione").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK", null).show(); return; }
+        if (clipboard == null || !clipboard.hasPrimaryClip()) {
+            new AlertDialog.Builder(this).setTitle("Importa calibrazione").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK", null).show();
+            return;
+        }
         CharSequence cs = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
         final String raw = cs == null ? "" : cs.toString();
-        new AlertDialog.Builder(this).setTitle("Importa calibrazione tastiera").setMessage(raw).setPositiveButton("IMPORTA", (d,w) -> { Intent i=new Intent("com.codybot.IMPORT_KEYBOARD"); i.setPackage(getPackageName()); i.putExtra("data",raw); sendBroadcast(i); }).setNegativeButton("ANNULLA",null).show();
+        final EditText editor = new EditText(this);
+        editor.setText(raw);
+        editor.setTextSize(14);
+        editor.setGravity(android.view.Gravity.TOP);
+        editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        editor.setMinLines(12);
+        editor.setSelectAllOnFocus(false);
+        new AlertDialog.Builder(this)
+                .setTitle("Importa calibrazione tastiera")
+                .setMessage("Puoi modificare liberamente le coordinate prima di salvarle.")
+                .setView(editor)
+                .setPositiveButton("SALVA", (d,w) -> {
+                    Intent i=new Intent("com.codybot.IMPORT_KEYBOARD");
+                    i.setPackage(getPackageName());
+                    i.putExtra("data",editor.getText().toString());
+                    sendBroadcast(i);
+                })
+                .setNegativeButton("ANNULLA",null)
+                .show();
     }
 
     private void importSchemaCalibration() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (clipboard == null || !clipboard.hasPrimaryClip()) { new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK", null).show(); return; }
+        if (clipboard == null || !clipboard.hasPrimaryClip()) {
+            new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK", null).show();
+            return;
+        }
         CharSequence cs = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
         final String raw = cs == null ? "" : cs.toString();
-        new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage(raw).setPositiveButton("IMPORTA", (d,w) -> { Intent i=new Intent("com.codybot.IMPORT_SCHEMA"); i.setPackage(getPackageName()); i.putExtra("data",raw); sendBroadcast(i); }).setNegativeButton("ANNULLA",null).show();
+        final EditText editor = new EditText(this);
+        editor.setText(raw);
+        editor.setTextSize(14);
+        editor.setGravity(android.view.Gravity.TOP);
+        editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        editor.setMinLines(14);
+        editor.setSelectAllOnFocus(false);
+        new AlertDialog.Builder(this)
+                .setTitle("Importa schemi")
+                .setMessage("Puoi modificare le coordinate degli schemi prima di salvarle.")
+                .setView(editor)
+                .setPositiveButton("SALVA", (d,w) -> {
+                    Intent i=new Intent("com.codybot.IMPORT_SCHEMA");
+                    i.setPackage(getPackageName());
+                    i.putExtra("data",editor.getText().toString());
+                    sendBroadcast(i);
+                })
+                .setNegativeButton("ANNULLA",null)
+                .show();
     }
 
-    private void chooseSchemaLength(String title, String action) {
+    private void chooseSchemaLength    private void chooseSchemaLength(String title, String action) {
         final String[] lengths = new String[18];
         for (int i = 0; i < lengths.length; i++) {
             lengths[i] = String.valueOf(i + 3);
