@@ -56,6 +56,17 @@ public class MainActivity extends Activity {
         testButton.setOnClickListener(v -> refreshStatus());
         layout.addView(testButton);
 
+        Button keyboardTestButton = new Button(this);
+        keyboardTestButton.setText("4. TEST TASTIERA");
+        keyboardTestButton.setOnClickListener(v -> {
+            Intent testIntent = new Intent("com.codybot.TEST_KEYBOARD");
+            testIntent.setPackage(getPackageName());
+            sendBroadcast(testIntent);
+            status.setText("TEST TASTIERA AVVIATO\\n\\n"
+                    + "CodyBot proverà a digitare A-Z sulla tastiera visibile.");
+        });
+        layout.addView(keyboardTestButton);
+
         Button startButton = new Button(this);
         startButton.setText("START / STOP CODYBOT");
         startButton.setOnClickListener(v -> {
