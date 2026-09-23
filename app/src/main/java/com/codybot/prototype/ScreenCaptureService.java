@@ -312,7 +312,7 @@ public class ScreenCaptureService extends Service {
          .replace('ð','d').replace('Ð','D')
          .replace('þ','t').replace('Þ','T')
          .replace('ß','s')
-         .replace('\u2019',"'").replace('\u2018',"'")
+         .replace("\u2019","'").replace("\u2018", "'")
          .replace('\u2010',"-").replace('\u2011',"-").replace('\u2013',"-").replace('\u2014',"-");
 
         return s;
