@@ -32,8 +32,8 @@ public class ScreenCaptureService extends Service {
 
     private void toggleService() {
         isRunning = !isRunning;
-        String statusMessage = isRunning ? "CodyBot avviato" : "CodyBot fermato";
-        Toast.makeText(this, statusMessage, Toast.LENGTH_SHORT).show();
+        String statusMessage = isRunning ? "CodyBot AVVIATO" : "CodyBot FERMATO";
+        Toast.makeText(getApplicationContext(), statusMessage, Toast.LENGTH_SHORT).show();
         Log.d(TAG, statusMessage);
     }
 
