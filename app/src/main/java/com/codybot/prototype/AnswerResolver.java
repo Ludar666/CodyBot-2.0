@@ -141,7 +141,7 @@ public class AnswerResolver {
     }
 
     private static String buildSlug(String clue) {
-        return normalizeText(clue).replaceAll("[^a-z0-9\\\\s-]", "").replaceAll("\\\\s+", "-").replaceAll("-+", "-");
+        return normalizeText(clue).replaceAll("[^a-z0-9\\s-]", "").replaceAll("\\s+", "-").replaceAll("-+", "-");
     }
 
     private static String fetchCodyCrossUrl(String pageUrl, String clue, int expectedLength) {
@@ -160,7 +160,7 @@ public class AnswerResolver {
                     .replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ")
                     .replaceAll("&nbsp;", " ").replaceAll("&quot;", "\\\"")
                     .replaceAll("&#39;", "'").replaceAll("&amp;", "&")
-                    .replaceAll("\\\\s+", " ").trim();
+                    .replaceAll("\\s+", " ").trim();
             String normalizedPage = normalizeText(text);
             String[] words = clue.split(" "); int relevant = 0, found = 0;
             for (String word : words) { if (word.length() < 3) continue; relevant++; if (normalizedPage.contains(normalizeText(word))) found++; }
