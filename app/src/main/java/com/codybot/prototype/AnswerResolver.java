@@ -85,11 +85,10 @@ public class AnswerResolver {
         String structured = structuredSearch(cleanClue, expectedLength);
         if (structured != null) return structured;
 
-        // Fallback prudente: ricerca generica, ma accetta solo candidati esplicitamente
-        // introdotti da "risposta/soluzione" e che rispettano i controlli di validità.
-        String online = onlineSearch(cleanClue, expectedLength);
-        if (online != null) return online;
-        return "NON TROVATA [archivio locale + ricerca online]";
+        // Nessun fallback generico: se la fonte strutturata non conferma una
+        // risposta, NON restituiamo candidati presi casualmente dai risultati web.
+        // In questo modo CodyBot non può più digitare parole arbitrarie.
+        return "NON TROVATA [archivio locale + ricerca strutturata]";
     }
 
     private static String structuredSearch(String clue, int expectedLength) {
