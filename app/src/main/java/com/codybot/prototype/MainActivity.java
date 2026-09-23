@@ -15,7 +15,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-public class MainActivity {
+public class MainActivity extends Activity {
 
     private TextView status;
 
@@ -91,12 +91,12 @@ public class MainActivity {
                         Intent intent = new Intent("com.codybot.CALIBRATE_KEYBOARD");
                         intent.setPackage(getPackageName());
                         sendBroadcast(intent);
-                        status.setText("CALIBRAZIONE AVVIATA\n\nTocca A-Z sulla tastiera CodyCross.");
+                        status.setText("CALIBRAZIONE AVVIATA\\n\\nTocca A-Z sulla tastiera CodyCross.");
                     } else if (which == 1) {
                         Intent testIntent = new Intent("com.codybot.TEST_KEYBOARD");
                         testIntent.setPackage(getPackageName());
                         sendBroadcast(testIntent);
-                        status.setText("TEST TASTIERA AVVIATO\n\nCodyBot proverà a digitare A-Z.");
+                        status.setText("TEST TASTIERA AVVIATO\\n\\nCodyBot proverà a digitare A-Z.");
                     } else {
                         exportCalibration();
                     }
@@ -127,12 +127,12 @@ public class MainActivity {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("CodyBot - Calibrazione tastiera\n");
+        sb.append("CodyBot - Calibrazione tastiera\\n");
         sb.append("Schermo: ")
                 .append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("width", 0))
                 .append(" x ")
                 .append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("height", 0))
-                .append("\n\n");
+                .append("\\n\\n");
 
         String letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         for (int i = 0; i < 26; i++) {
@@ -141,7 +141,7 @@ public class MainActivity {
                     .append(Math.round(Float.parseFloat(parts[i * 2])))
                     .append(", ")
                     .append(Math.round(Float.parseFloat(parts[i * 2 + 1])))
-                    .append("\n");
+                    .append("\\n");
         }
 
         final String exportText = sb.toString();
@@ -185,8 +185,8 @@ public class MainActivity {
         boolean overlay = Settings.canDrawOverlays(this);
         boolean accessibility = isAccessibilityEnabled();
         status.setText("Sovrapposizione: " + (overlay ? "ATTIVA ✓" : "NON ATTIVA ✗")
-                + "\nAccessibilità: " + (accessibility ? "ATTIVA ✓" : "NON ATTIVA ✗")
-                + "\n\nPer vedere CodyBot sopra CodyCross devono essere attive ENTRAMBE.");
+                + "\\nAccessibilità: " + (accessibility ? "ATTIVA ✓" : "NON ATTIVA ✗")
+                + "\\n\\nPer vedere CodyBot sopra CodyCross devono essere attive ENTRAMBE.");
     }
 
     @Override
