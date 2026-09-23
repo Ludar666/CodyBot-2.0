@@ -232,19 +232,81 @@ public class CodyAccessibilityService extends AccessibilityService {
             return;
         }
 
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("🔧 CALIBRAZIONE TASTIERA")
-                .setMessage(
-                        "1. Apri CodyCross.\n\n" +
-                        "2. Entra in una domanda e lascia visibile tutta la tastiera.\n\n" +
-                        "3. Quando sei pronto, premi AVVIA ACQUISIZIONE.\n\n" +
-                        "CodyBot ti chiederà di toccare A, B, C... fino a Z.")
-                .setNegativeButton("ANNULLA", null)
-                .setPositiveButton("AVVIA ACQUISIZIONE", (dialog, which) -> {
-                    updateOverlayText("🔧 Preparazione calibrazione...");
-                    handler.postDelayed(() -> showManualCalibrationOverlay(), 700);
-                })
-                .show();
+        // Un AccessibilityService non dispone di una Activity a cui agganciare
+        // un AlertDialog: su alcuni telefoni questo provoca BadTokenException
+        // e quindi il crash dell'app. Usiamo un piccolo pannello overlay nativo.
+        if (calibrationView != null) removeCalibrationOverlay();
+
+        final LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(28, 24, 28, 24);
+        panel.setBackgroundColor(Color.parseColor("#EE111111"));
+
+        TextView title = new TextView(this);
+        title.setText("🔧 CALIBRAZIONE TASTIERA");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(20);
+        title.setGravity(Gravity.CENTER);
+        panel.addView(title, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView message = new TextView(this);
+        message.setText(
+                "1. Apri CodyCross.\n\n" +
+                "2. Entra in una domanda e lascia visibile tutta la tastiera.\n\n" +
+                "3. Quando sei pronto, premi AVVIA ACQUISIZIONE.\n\n" +
+                "CodyBot ti chiederà di toccare A, B, C... fino a Z.");
+        message.setTextColor(Color.WHITE);
+        message.setTextSize(16);
+        message.setPadding(0, 20, 0, 20);
+        panel.addView(message, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setGravity(Gravity.CENTER);
+
+        Button cancel = new Button(this);
+        cancel.setText("ANNULLA");
+        cancel.setOnClickListener(v -> removeCalibrationOverlay());
+
+        Button start = new Button(this);
+        start.setText("AVVIA ACQUISIZIONE");
+        start.setOnClickListener(v -> {
+            removeCalibrationOverlay();
+            updateOverlayText("🔧 Preparazione calibrazione...");
+            handler.postDelayed(this::showManualCalibrationOverlay, 500);
+        });
+
+        buttons.addView(cancel);
+        buttons.addView(start);
+        panel.addView(buttons, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        calibrationView = panel;
+
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int width = (int) (dm.widthPixels * 0.90f);
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                width,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        params.y = 120;
+
+        try {
+            windowManager.addView(calibrationView, params);
+        } catch (Exception e) {
+            calibrationView = null;
+            updateOverlayText("❌ Errore calibrazione: " + e.getClass().getSimpleName());
+        }
     }
 
     private void showManualCalibrationOverlay() {
