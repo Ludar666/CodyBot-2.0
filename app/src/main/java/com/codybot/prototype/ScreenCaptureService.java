@@ -45,7 +45,17 @@ public class ScreenCaptureService extends Service {
     @Override public int onStartCommand(Intent i,int flags,int id){
         if(i==null) return START_STICKY;
         String a=i.getAction();
-        if(ACTION_TOGGLE.equals(a)){ if(running) stopCapture(); else requestProjection(); }
+        if(ACTION_TOGGLE.equals(a)){
+            if(running) {
+                // STOP = pausa: manteniamo la stessa sessione MediaProjection.
+                // Cosi' START successivo non richiede di nuovo il consenso.
+                stopScanning();
+            } else if(projection != null && reader != null && display != null) {
+                startScanning();
+            } else {
+                requestProjection();
+            }
+        }
         else if(ACTION_START_CAPTURE.equals(a)) startCapture(i);
         else if(ACTION_STOP_CAPTURE.equals(a)) stopCapture();
         updateStatus();
@@ -77,6 +87,16 @@ public class ScreenCaptureService extends Service {
             MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
             projection=m.getMediaProjection(rc,data);
             if(projection==null) throw new IllegalStateException("MediaProjection non disponibile");
+
+            projection.registerCallback(new MediaProjection.Callback() {
+                @Override public void onStop() {
+                    handler.post(() -> {
+                        stopScanning();
+                        projection = null;
+                    });
+                }
+            }, handler);
+
             startScanning();
         }catch(Exception e){
             broadcast("ERRORE AVVIO: "+e.getMessage(),"");
@@ -319,9 +339,10 @@ public class ScreenCaptureService extends Service {
         running=false;
         lastClue="";
         lastScan=0;
-        if(display!=null){display.release();display=null;}
-        if(reader!=null){reader.close();reader=null;}
-        broadcast("🔴 SCANSIONE FERMA","");
+        // Non rilasciamo MediaProjection/VirtualDisplay: STOP e' una pausa.
+        // Rilasciare il display renderebbe necessario un nuovo consenso Android
+        // per la sessione successiva su Android 14+.
+        broadcast("🔴 SCANSIONE IN PAUSA","");
     }
 
     private void stopCapture(){
