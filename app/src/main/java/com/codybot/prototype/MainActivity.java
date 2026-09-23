@@ -68,13 +68,22 @@ public class MainActivity extends Activity {
         layout.addView(keyboardTestButton);
 
         Button startButton = new Button(this);
-        startButton.setText("START / STOP CODYBOT");
+        startButton.setText("START CODYBOT");
         startButton.setOnClickListener(v -> {
             Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
             serviceIntent.setAction(ScreenCaptureService.ACTION_TOGGLE);
             startService(serviceIntent);
         });
         layout.addView(startButton);
+
+        Button stopButton = new Button(this);
+        stopButton.setText("STOP CODYBOT");
+        stopButton.setOnClickListener(v -> {
+            Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
+            serviceIntent.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);
+            startService(serviceIntent);
+        });
+        layout.addView(stopButton);
 
         setContentView(layout);
         refreshStatus();
