@@ -236,7 +236,115 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
   return (299*Color.red(color)+587*Color.green(color)+114*Color.blue(color))/1000;
  }
  private int schemaSpacing(int[] centers){if(centers==null||centers.length<4)return 70;int sum=0,count=0;for(int i=1;i<centers.length/2;i++){int d=Math.abs(centers[i*2]-centers[(i-1)*2]);if(d>5&&d<500){sum+=d;count++;}}return count>0?sum/count:70;}
- private void startSchemaCalibration(int length){stopCompilation();if(length<1||length>20){updateOverlayText("⚠️ Numero lettere non valido");return;}if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}removeCalibrationOverlay();final int sw=getResources().getDisplayMetrics().widthPixels,sh=getResources().getDisplayMetrics().heightPixels;final int[] centers=new int[length*2];final int[] idx=new int[]{0};FrameLayout f=new FrameLayout(this);f.setBackgroundColor(Color.TRANSPARENT);f.setClickable(true);TextView p=new TextView(this);p.setTextColor(Color.WHITE);p.setTextSize(18);p.setGravity(Gravity.CENTER);p.setBackgroundColor(Color.parseColor("#DD000000"));p.setText("🔧 CALIBRAZIONE SCHEMA\n\nTocca il centro della posizione 1\n1/"+length+"\n\nEvita di toccare la tastiera.");FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);pp.topMargin=55;f.addView(p,pp);f.setOnTouchListener((v,e)->{if(e==null||e.getAction()!=android.view.MotionEvent.ACTION_UP)return true;if(e.getY()<220)return true;int i=idx[0];if(i>=length)return true;centers[i*2]=Math.round(e.getX());centers[i*2+1]=Math.round(e.getY());idx[0]++;if(idx[0]<length){p.setText("🔧 CALIBRAZIONE SCHEMA\n\nTocca il centro della posizione "+(idx[0]+1)+"\n"+idx[0]+"/"+length+"\n\nEvita di toccare la tastiera.");}else{saveSchemaCalibration(length,centers,sw,sh);removeCalibrationOverlay();updateOverlayText("✅ SCHEMA "+length+" LETTERE CALIBRATO\n"+length+"/"+length+" posizioni salvate");}return true;});calibrationView=f;WindowManager.LayoutParams q=new WindowManager.LayoutParams(sw,sh,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);q.gravity=Gravity.TOP|Gravity.START;try{windowManager.addView(calibrationView,q);}catch(Exception e){calibrationView=null;updateOverlayText("❌ Errore calibrazione schema: "+e.getClass().getSimpleName());}}
+ private void startSchemaCalibration(int length){
+  stopCompilation();
+  if(length<1||length>20){updateOverlayText("⚠️ Numero lettere non valido");return;}
+  if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}
+  removeCalibrationOverlay();
+
+  // Prima mostriamo le istruzioni senza bloccare CodyCross.
+  // L'utente può quindi passare a CodyCross e premere AVVIA ACQUISIZIONE.
+  LinearLayout p=new LinearLayout(this);
+  p.setOrientation(LinearLayout.VERTICAL);
+  p.setGravity(Gravity.CENTER_HORIZONTAL);
+  p.setPadding(28,24,28,24);
+  p.setBackgroundColor(Color.parseColor("#EE111111"));
+
+  TextView t=new TextView(this);
+  t.setText("📐 CALIBRAZIONE SCHEMA");
+  t.setTextColor(Color.WHITE);
+  t.setTextSize(20);
+  t.setGravity(Gravity.CENTER);
+  p.addView(t,new LinearLayout.LayoutParams(-1,-2));
+
+  TextView m=new TextView(this);
+  m.setText("1. Apri CodyCross.\\n\\n2. Entra in una domanda e lascia visibili tutte le caselle dello schema.\\n\\n3. Premi AVVIA ACQUISIZIONE.\\n\\nCodyBot ti chiederà di toccare il centro delle posizioni 1, 2, 3... fino alla fine.\\n\\n⚠️ Tocca solo le caselle dello schema, non la tastiera.");
+  m.setTextColor(Color.WHITE);
+  m.setTextSize(16);
+  m.setPadding(0,20,0,20);
+  p.addView(m,new LinearLayout.LayoutParams(-1,-2));
+
+  LinearLayout r=new LinearLayout(this);
+  r.setGravity(Gravity.CENTER);
+  Button c=new Button(this);
+  c.setText("ANNULLA");
+  c.setOnClickListener(v->removeCalibrationOverlay());
+
+  Button s=new Button(this);
+  s.setText("AVVIA ACQUISIZIONE");
+  s.setOnClickListener(v->{
+    removeCalibrationOverlay();
+    updateOverlayText("🔧 Preparazione calibrazione schema...");
+    handler.postDelayed(()->showSchemaCalibrationOverlay(length),500);
+  });
+  r.addView(c);
+  r.addView(s);
+  p.addView(r);
+
+  calibrationView=p;
+  DisplayMetrics dm=getResources().getDisplayMetrics();
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams(
+          (int)(dm.widthPixels*.90f),-2,
+          WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+          PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;
+  q.y=120;
+  try{windowManager.addView(calibrationView,q);}
+  catch(Exception e){calibrationView=null;updateOverlayText("❌ Errore calibrazione schema: "+e.getClass().getSimpleName());}
+ }
+
+ private void showSchemaCalibrationOverlay(int length){
+  if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}
+  final int sw=getResources().getDisplayMetrics().widthPixels;
+  final int sh=getResources().getDisplayMetrics().heightPixels;
+  final int[] centers=new int[length*2];
+  final int[] idx=new int[]{0};
+
+  FrameLayout f=new FrameLayout(this);
+  f.setBackgroundColor(Color.TRANSPARENT);
+  f.setClickable(true);
+
+  TextView p=new TextView(this);
+  p.setTextColor(Color.WHITE);
+  p.setTextSize(18);
+  p.setGravity(Gravity.CENTER);
+  p.setBackgroundColor(Color.parseColor("#DD000000"));
+  p.setText("🔧 CALIBRAZIONE SCHEMA\\n\\nTocca il centro della posizione 1\\n0/"+length+"\\n\\nCodyCross deve essere visibile.");
+  FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);
+  pp.topMargin=55;
+  f.addView(p,pp);
+
+  f.setOnTouchListener((v,e)->{
+    if(e==null||e.getAction()!=android.view.MotionEvent.ACTION_UP)return true;
+    if(e.getY()<220)return true;
+    int i=idx[0];
+    if(i>=length)return true;
+
+    centers[i*2]=Math.round(e.getX());
+    centers[i*2+1]=Math.round(e.getY());
+    idx[0]++;
+
+    if(idx[0]<length){
+      p.setText("🔧 CALIBRAZIONE SCHEMA\\n\\nTocca il centro della posizione "+(idx[0]+1)+"\\n"+idx[0]+"/"+length+"\\n\\nCodyCross deve essere visibile.");
+    }else{
+      saveSchemaCalibration(length,centers,sw,sh);
+      removeCalibrationOverlay();
+      updateOverlayText("✅ SCHEMA "+length+" LETTERE CALIBRATO\\n"+length+"/"+length+" posizioni salvate");
+    }
+    return true;
+  });
+
+  calibrationView=f;
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams(
+          sw,sh,
+          WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+          PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.START;
+  try{windowManager.addView(calibrationView,q);}
+  catch(Exception e){calibrationView=null;updateOverlayText("❌ Errore calibrazione schema: "+e.getClass().getSimpleName());}
+ }
  private void saveSchemaCalibration(int length,int[] centers,int w,int h){StringBuilder sb=new StringBuilder();for(int i=0;i<centers.length;i++){if(i>0)sb.append(',');sb.append(centers[i]);}getSharedPreferences("codybot_schema",MODE_PRIVATE).edit().putString("centers_"+length,sb.toString()).putInt("width_"+length,w).putInt("height_"+length,h).apply();}
  private int[] getSchemaCenters(int length){String raw=getSharedPreferences("codybot_schema",MODE_PRIVATE).getString("centers_"+length,null);if(raw==null)return null;String[] p=raw.split(",");if(p.length!=length*2)return null;try{int[] c=new int[p.length];for(int i=0;i<p.length;i++)c[i]=Integer.parseInt(p[i]);return c;}catch(Exception e){return null;}}
  private boolean hasSchemaCalibration(int length){return getSchemaCenters(length)!=null;}
