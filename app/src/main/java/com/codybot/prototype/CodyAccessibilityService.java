@@ -156,7 +156,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         statusText.setTextColor(Color.WHITE);
         statusText.setTextSize(14);
         statusText.setGravity(Gravity.CENTER);
-        statusText.setMaxLines(4);
+        statusText.setMaxLines(6);
         statusText.setPadding(4, 0, 4, 4);
         layout.addView(statusText,
                 new LinearLayout.LayoutParams(
@@ -200,8 +200,10 @@ public class CodyAccessibilityService extends AccessibilityService {
                         LinearLayout.LayoutParams.WRAP_CONTENT));
         overlayView = layout;
 
+        DisplayMetrics overlayDm = getResources().getDisplayMetrics();
+        int overlayWidth = (int) (overlayDm.widthPixels * 0.92f);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
+                overlayWidth,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
@@ -230,34 +232,96 @@ public class CodyAccessibilityService extends AccessibilityService {
             return;
         }
 
-        // Prima portiamo in primo piano l'ultima app esterna rilevata
-        // (normalmente CodyCross). In questo modo, premendo CALIBRA da
-        // CodyBot, l'utente si ritrova direttamente sulla tastiera del gioco.
+        // Portiamo in primo piano PROPRIO CodyCross cercandolo tra le app recenti.
+        // In questo modo riprendiamo la partita già aperta, invece di lanciare
+        // una nuova istanza dalla schermata iniziale del gioco.
+        updateOverlayText("🔎 Cerco CodyCross tra le app aperte...");
+        if (!performGlobalAction(GLOBAL_ACTION_RECENTS)) {
+            updateOverlayText("⚠️ Impossibile aprire le app recenti");
+            return;
+        }
+
+        handler.postDelayed(() -> selectCodyCrossFromRecents(), 650);
+    }
+
+    private void selectCodyCrossFromRecents() {
+        AccessibilityNodeInfoMatch match = findCodyCrossNode();
+        if (match != null && match.node != null) {
+            try {
+                if (match.node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)) {
+                    updateOverlayText("🎮 CodyCross trovato. Avvio calibrazione...");
+                    handler.postDelayed(() -> showManualCalibrationOverlay(), 900);
+                    return;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // Fallback: se la scheda non espone un nodo cliccabile, proviamo
+        // l'ultima app esterna rilevata senza interrompere il flusso.
         String targetPackage = lastTargetPackage;
-        if (targetPackage == null || targetPackage.isEmpty()
-                || targetPackage.equals(getPackageName())) {
-            updateOverlayText("⚠️ Apri prima CodyCross, poi torna qui e premi CALIBRA");
-            return;
+        if (targetPackage != null && !targetPackage.isEmpty()
+                && !targetPackage.equals(getPackageName())) {
+            Intent launchGame = getPackageManager().getLaunchIntentForPackage(targetPackage);
+            if (launchGame != null) {
+                launchGame.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                try {
+                    startActivity(launchGame);
+                    handler.postDelayed(() -> showManualCalibrationOverlay(), 900);
+                    return;
+                } catch (Exception ignored) {}
+            }
         }
 
-        Intent launchGame = getPackageManager().getLaunchIntentForPackage(targetPackage);
-        if (launchGame == null) {
-            updateOverlayText("⚠️ Impossibile aprire il gioco");
-            return;
-        }
+        updateOverlayText("⚠️ CodyCross non trovato nelle app recenti");
+    }
 
-        launchGame.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+    private static class AccessibilityNodeInfoMatch {
+        final android.view.accessibility.AccessibilityNodeInfo node;
+        AccessibilityNodeInfoMatch(android.view.accessibility.AccessibilityNodeInfo node) {
+            this.node = node;
+        }
+    }
+
+    private AccessibilityNodeInfoMatch findCodyCrossNode() {
         try {
-            startActivity(launchGame);
-        } catch (Exception e) {
-            updateOverlayText("⚠️ Impossibile aprire il gioco");
-            return;
+            List<android.view.accessibility.AccessibilityWindowInfo> windows = getWindows();
+            for (android.view.accessibility.AccessibilityWindowInfo window : windows) {
+                android.view.accessibility.AccessibilityNodeInfo root = window.getRoot();
+                if (root == null) continue;
+
+                String pkg = root.getPackageName() == null ? "" : root.getPackageName().toString();
+                if (pkg.toLowerCase().contains("codycross")) {
+                    return new AccessibilityNodeInfoMatch(root);
+                }
+
+                AccessibilityNodeInfoMatch found = findCodyCrossInNode(root);
+                if (found != null) return found;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private AccessibilityNodeInfoMatch findCodyCrossInNode(
+            android.view.accessibility.AccessibilityNodeInfo node) {
+        if (node == null) return null;
+
+        CharSequence text = node.getText();
+        CharSequence desc = node.getContentDescription();
+        String value = ((text == null ? "" : text.toString()) + " "
+                + (desc == null ? "" : desc.toString())).toLowerCase();
+
+        if (value.contains("codycross")) {
+            return new AccessibilityNodeInfoMatch(node);
         }
 
-        // Aspettiamo che il gioco abbia ripreso il focus prima di mettere
-        // l'overlay di calibrazione sopra la tastiera.
-        handler.postDelayed(() -> showManualCalibrationOverlay(), 1000);
+        for (int i = 0; i < node.getChildCount(); i++) {
+            try {
+                AccessibilityNodeInfoMatch found = findCodyCrossInNode(node.getChild(i));
+                if (found != null) return found;
+            } catch (Exception ignored) {}
+        }
+        return null;
     }
 
     private void showManualCalibrationOverlay() {
