@@ -43,6 +43,7 @@ public class ScreenCaptureService extends Service {
         if(ACTION_TOGGLE.equals(a)){ if(running) stopCapture(); else requestProjection(); }
         else if(ACTION_START_CAPTURE.equals(a)) startCapture(i);
         else if(ACTION_STOP_CAPTURE.equals(a)) stopCapture();
+        updateStatus();
         return START_STICKY;
     }
     private Notification notification(){
@@ -56,7 +57,7 @@ public class ScreenCaptureService extends Service {
     }
     private void requestProjection(){
         Intent x=new Intent(this,MediaProjectionActivity.class); x.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(x);
-        broadcast("Premi Consenti per avviare la cattura", "");
+        broadcast("RICHIESTA CATTURA: premi Consenti","");
     }
     private void startCapture(Intent i){
         try{
@@ -65,6 +66,7 @@ public class ScreenCaptureService extends Service {
             Intent data=i.getParcelableExtra(EXTRA_DATA);
             MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
             projection=m.getMediaProjection(rc,data);
+            if(projection==null) throw new IllegalStateException("MediaProjection non disponibile");
             DisplayMetrics dm=getResources().getDisplayMetrics(); int w=dm.widthPixels,h=dm.heightPixels;
             reader=ImageReader.newInstance(w,h,PixelFormat.RGBA_8888,2);
             reader.setOnImageAvailableListener(r->{
@@ -79,12 +81,13 @@ public class ScreenCaptureService extends Service {
                     Image.Plane p=image.getPlanes()[0]; ByteBuffer buf=p.getBuffer(); int ps=p.getPixelStride(), rs=p.getRowStride(); int pad=rs-ps*w;
                     Bitmap full=Bitmap.createBitmap(w+pad/ps,h,Bitmap.Config.ARGB_8888); full.copyPixelsFromBuffer(buf);
                     int top=(int)(h*.54f), bottom=(int)(h*.75f); Bitmap crop=Bitmap.createBitmap(full,0,top,w,bottom-top); full.recycle(); runOcr(crop);
-                }catch(Exception e){broadcast("Errore cattura: "+e.getClass().getSimpleName(),"");}
+                }catch(Exception e){broadcast("ERRORE CATTURA: "+e.getClass().getSimpleName(),"");}
                 finally{if(image!=null)image.close();}
             },handler);
             display=projection.createVirtualDisplay("CodyBot",w,h,dm.densityDpi,android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,reader.getSurface(),null,handler);
-            running=true; broadcast("CATTURA ATTIVA","Cattura schermo...");
-        }catch(Exception e){broadcast("Errore cattura: "+e.getMessage(),"");stopCapture();}
+            running=true; lastScan=0; lastClue="";
+            broadcast("🟢 SCANSIONE ATTIVA\nIn attesa dell'indizio...","");
+        }catch(Exception e){broadcast("ERRORE AVVIO: "+e.getMessage(),"");stopCapture();}
     }
     private void runOcr(Bitmap bmp){
         InputImage input=InputImage.fromBitmap(bmp,0);
@@ -95,16 +98,19 @@ public class ScreenCaptureService extends Service {
             String clue=text.replaceAll("\\s+"," ").trim();
             if(clue.equalsIgnoreCase(lastClue))return;
             lastClue=clue;
-            broadcast("INDIZIO: "+clue,clue);
+            broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRicerca risposta...",clue);
             String ans=AnswerResolver.resolve(this,clue,-1);
             if(ans!=null&&!ans.startsWith("Non in archivio")&&!ans.startsWith("Nessun")){
-                broadcast("RISPOSTA: "+ans,ans);
+                broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: "+ans+"\nCompilazione...",ans);
                 Intent x=new Intent("com.codybot.FILL_ANSWER"); x.setPackage(getPackageName()); x.putExtra("answer",ans); sendBroadcast(x);
-            } else broadcast("RISPOSTA: non trovata","");
-        }).addOnFailureListener(e->{bmp.recycle(); broadcast("OCR: errore","");});
+            } else {
+                broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: NON TROVATA","");
+            }
+        }).addOnFailureListener(e->{bmp.recycle(); broadcast("🟢 SCANSIONE ATTIVA\nOCR: ERRORE","");});
     }
     private void broadcast(String msg,String clue){ Intent x=new Intent("com.codybot.UPDATE_OVERLAY"); x.setPackage(getPackageName()); x.putExtra("message",msg); x.putExtra("clue",clue); sendBroadcast(x); }
-    private void stopCapture(){ running=false; lastClue=""; if(display!=null){display.release();display=null;} if(reader!=null){reader.close();reader=null;} if(projection!=null){projection.stop();projection=null;} }
+    private void updateStatus(){ broadcast(running?"🟢 SCANSIONE ATTIVA":"🔴 SCANSIONE FERMA",""); }
+    private void stopCapture(){ running=false; lastClue=""; lastScan=0; if(display!=null){display.release();display=null;} if(reader!=null){reader.close();reader=null;} if(projection!=null){projection.stop();projection=null;} broadcast("🔴 SCANSIONE FERMA",""); }
     public static boolean isServiceRunning(){return running;}
     @Nullable @Override public IBinder onBind(Intent i){return null;}
     @Override public void onDestroy(){stopCapture();if(recognizer!=null)recognizer.close();super.onDestroy();}
