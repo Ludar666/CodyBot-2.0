@@ -13,6 +13,7 @@ import android.util.DisplayMetrics;
 import androidx.annotation.Nullable;
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
+import com.codybot.app.CodyAccessibilityService;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
