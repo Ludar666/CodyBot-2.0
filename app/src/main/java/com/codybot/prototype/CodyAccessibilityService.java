@@ -224,9 +224,11 @@ public class CodyAccessibilityService extends AccessibilityService {
         final String row2 = "ASDFGHJKL";
         final String row3 = "ZXCVBNM";
         int idx;
-        if ((idx = row1.indexOf(c)) >= 0) return new float[]{w * (0.048f + idx * 0.101f), h * 0.764f};
-        if ((idx = row2.indexOf(c)) >= 0) return new float[]{w * (0.060f + idx * 0.101f), h * 0.850f};
-        if ((idx = row3.indexOf(c)) >= 0) return new float[]{w * (0.199f + idx * 0.101f), h * 0.925f};
+        // Coordinate calibrate per la tastiera CodyCross: usiamo percentuali più
+        // conservative e centrate per evitare di colpire il tasto adiacente.
+        if ((idx = row1.indexOf(c)) >= 0) return new float[]{w * (0.050f + idx * 0.100f), h * 0.770f};
+        if ((idx = row2.indexOf(c)) >= 0) return new float[]{w * (0.100f + idx * 0.100f), h * 0.855f};
+        if ((idx = row3.indexOf(c)) >= 0) return new float[]{w * (0.250f + idx * 0.100f), h * 0.940f};
         return null;
     }
 
