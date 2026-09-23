@@ -9,6 +9,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.Path;
+import android.graphics.Bitmap;
+import android.graphics.Rect;
+import android.os.Build;
 import android.graphics.PixelFormat;
 import android.net.Uri;
 import android.os.Handler;
@@ -38,6 +41,8 @@ public class CodyAccessibilityService extends AccessibilityService {
     private final List<Runnable> pendingCompilation = new ArrayList<>();
     private boolean compiling = false;
     private static volatile String lastTargetPackage = "";
+    private volatile float[] calibratedCenters;
+    private volatile boolean calibrationInProgress = false;
 
     private final Runnable overlayChecker = new Runnable() {
         @Override public void run() {
@@ -184,16 +189,52 @@ public class CodyAccessibilityService extends AccessibilityService {
         compiling = true;
         if (statusText != null) statusText.setText("🟡 COMPILAZIONE: " + clean);
 
+        // Prima proviamo a calibrare la tastiera dalla schermata reale.
+        // Se il dispositivo non supporta takeScreenshot(), usiamo il fallback.
+        if (Build.VERSION.SDK_INT >= 30 && !calibrationInProgress) {
+            calibrationInProgress = true;
+            takeScreenshot(android.view.Display.DEFAULT_DISPLAY,
+                    getMainExecutor(),
+                    new android.accessibilityservice.AccessibilityService.TakeScreenshotCallback() {
+                        @Override public void onSuccess(android.accessibilityservice.AccessibilityService.ScreenshotResult result) {
+                            try {
+                                calibratedCenters = detectKeyboardCenters(result.getBitmap());
+                            } catch (Exception ignored) {
+                                calibratedCenters = null;
+                            } finally {
+                                try { result.getBitmap().recycle(); } catch (Exception ignored) {}
+                                calibrationInProgress = false;
+                                scheduleAnswerTaps(clean);
+                            }
+                        }
+                        @Override public void onFailure(int errorCode) {
+                            calibrationInProgress = false;
+                            scheduleAnswerTaps(clean);
+                        }
+                    });
+            return;
+        }
+        scheduleAnswerTaps(clean);
+    }
+
+    private void stopCompilation() {
+        for (Runnable r : pendingCompilation) handler.removeCallbacks(r);
+        pendingCompilation.clear();
+        compiling = false;
+        if (statusText != null) statusText.setText("🔴 STOP");
+    }
+
+    private void scheduleAnswerTaps(final String clean) {
         DisplayMetrics dm = getResources().getDisplayMetrics();
         final float w = dm.widthPixels;
         final float h = dm.heightPixels;
 
         for (int i = 0; i < clean.length(); i++) {
             final char letter = clean.charAt(i);
-            final float[] xy = keyCenter(letter, w, h);
+            final float[] xy = calibratedKeyCenter(letter, w, h);
             if (xy == null) continue;
 
-            final long delay = i * 180L;
+            final long delay = i * 220L;
             final Runnable tapRunnable = () -> {
                 if (!compiling || !ScreenCaptureService.isServiceRunning()) return;
                 tap(xy[0], xy[1]);
@@ -207,16 +248,117 @@ public class CodyAccessibilityService extends AccessibilityService {
             compiling = false;
             pendingCompilation.clear();
             updateOverlayText("COMPILATA: " + clean);
+            calibratedCenters = null;
         };
         pendingCompilation.add(finishRunnable);
-        handler.postDelayed(finishRunnable, clean.length() * 180L + 150L);
+        handler.postDelayed(finishRunnable, clean.length() * 220L + 250L);
     }
 
-    private void stopCompilation() {
-        for (Runnable r : pendingCompilation) handler.removeCallbacks(r);
-        pendingCompilation.clear();
-        compiling = false;
-        if (statusText != null) statusText.setText("🔴 STOP");
+    private float[] calibratedKeyCenter(char c, float w, float h) {
+        final String row1 = "QWERTYUIOP";
+        final String row2 = "ASDFGHJKL";
+        final String row3 = "ZXCVBNM";
+        int idx;
+        if (calibratedCenters != null && calibratedCenters.length >= 38) {
+            if ((idx = row1.indexOf(c)) >= 0) return new float[]{calibratedCenters[idx * 2], calibratedCenters[idx * 2 + 1]};
+            if ((idx = row2.indexOf(c)) >= 0) { int p = 10 + idx; return new float[]{calibratedCenters[p * 2], calibratedCenters[p * 2 + 1]}; }
+            if ((idx = row3.indexOf(c)) >= 0) { int p = 19 + idx; return new float[]{calibratedCenters[p * 2], calibratedCenters[p * 2 + 1]}; }
+        }
+        return keyCenter(c, w, h);
+    }
+
+    /**
+     * Cerca i 26 centri dei tasti nella parte bassa dello screenshot.
+     * Il rilevamento usa la variazione verticale di luminosità: i bordi dei
+     * tasti producono picchi regolari e permettono di evitare coordinate fisse.
+     */
+    private float[] detectKeyboardCenters(Bitmap bmp) {
+        if (bmp == null) return null;
+        int w = bmp.getWidth(), h = bmp.getHeight();
+        if (w < 300 || h < 500) return null;
+
+        int yStart = (int)(h * 0.62f);
+        int yEnd = (int)(h * 0.985f);
+        int[] rowPeaks = new int[h];
+        for (int y = yStart; y < yEnd; y++) {
+            int sum = 0;
+            int step = Math.max(2, w / 180);
+            for (int x = step; x < w - step; x += step) {
+                int a = pixelGray(bmp.getPixel(x, y));
+                int b = pixelGray(bmp.getPixel(x, Math.min(h - 1, y + 2)));
+                sum += Math.abs(a - b);
+            }
+            rowPeaks[y] = sum;
+        }
+
+        int[] rows = findThreeRows(rowPeaks, yStart, yEnd);
+        if (rows == null) return null;
+
+        float[] out = new float[52];
+        for (int r = 0; r < 3; r++) {
+            int cy = rows[r];
+            int[] xs = findKeyCentersOnRow(bmp, cy);
+            int expected = r == 0 ? 10 : (r == 1 ? 9 : 7);
+            if (xs.length != expected) return null;
+            for (int i = 0; i < expected; i++) {
+                out[(r == 0 ? i : r == 1 ? 10 + i : 19 + i) * 2] = xs[i];
+                out[(r == 0 ? i : r == 1 ? 10 + i : 19 + i) * 2 + 1] = cy;
+            }
+        }
+        return out;
+    }
+
+    private int[] findThreeRows(int[] score, int start, int end) {
+        int[] best = new int[]{-1,-1,-1};
+        int minGap = Math.max(35, (end-start)/10);
+        for (int a = start + 10; a < end - minGap * 2; a++) {
+            for (int b = a + minGap; b < end - minGap; b++) {
+                for (int d = b + minGap; d < end; d++) {
+                    int v = score[a] + score[b] + score[d];
+                    if (best[0] < 0 || v > score[best[0]] + score[best[1]] + score[best[2]]) best = new int[]{a,b,d};
+                }
+            }
+        }
+        return best[0] < 0 ? null : best;
+    }
+
+    private int[] findKeyCentersOnRow(Bitmap bmp, int cy) {
+        int w = bmp.getWidth();
+        int y1 = Math.max(0, cy - 24), y2 = Math.min(bmp.getHeight() - 1, cy + 24);
+        int[] score = new int[w];
+        for (int x = 1; x < w - 1; x++) {
+            int s = 0;
+            for (int y = y1; y <= y2; y += 4) {
+                s += Math.abs(pixelGray(bmp.getPixel(x,y)) - pixelGray(bmp.getPixel(x-1,y)));
+            }
+            score[x] = s;
+        }
+        int expected = cy < bmp.getHeight()*0.82f ? 10 : (cy < bmp.getHeight()*0.91f ? 9 : 7);
+        ArrayList<Integer> peaks = new ArrayList<>();
+        int minDistance = Math.max(25, w / 16);
+        for (int i = 1; i < w - 1; i++) {
+            if (score[i] > score[i-1] && score[i] >= score[i+1]) {
+                if (peaks.isEmpty() || i - peaks.get(peaks.size()-1) >= minDistance) peaks.add(i);
+                else if (score[i] > score[peaks.get(peaks.size()-1)]) peaks.set(peaks.size()-1, i);
+            }
+        }
+        // I bordi producono due picchi per tasto: trasformiamo le coppie in centri.
+        ArrayList<Integer> centers = new ArrayList<>();
+        for (int i=0; i+1<peaks.size(); i++) {
+            int gap = peaks.get(i+1)-peaks.get(i);
+            if (gap >= w/20 && gap <= w/7) {
+                centers.add((peaks.get(i)+peaks.get(i+1))/2);
+                i++;
+            }
+        }
+        if (centers.size() != expected) return new int[0];
+        int[] out = new int[centers.size()];
+        for (int i=0;i<out.length;i++) out[i]=centers.get(i);
+        return out;
+    }
+
+    private int pixelGray(int color) {
+        return (Color.red(color)*299 + Color.green(color)*587 + Color.blue(color)*114) / 1000;
     }
 
     private float[] keyCenter(char c, float w, float h) {
