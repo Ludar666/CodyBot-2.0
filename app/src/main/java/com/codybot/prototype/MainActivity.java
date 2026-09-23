@@ -5,6 +5,9 @@ import com.codybot.app.CodyAccessibilityService;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.ClipboardManager;
+import android.content.ClipData;
+import android.app.AlertDialog;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -56,16 +59,10 @@ public class MainActivity extends Activity {
         testButton.setOnClickListener(v -> refreshStatus());
         layout.addView(testButton);
 
-        Button keyboardTestButton = new Button(this);
-        keyboardTestButton.setText("4. TEST TASTIERA");
-        keyboardTestButton.setOnClickListener(v -> {
-            Intent testIntent = new Intent("com.codybot.TEST_KEYBOARD");
-            testIntent.setPackage(getPackageName());
-            sendBroadcast(testIntent);
-            status.setText("TEST TASTIERA AVVIATO\\n\\n"
-                    + "CodyBot proverà a digitare A-Z sulla tastiera visibile.");
-        });
-        layout.addView(keyboardTestButton);
+        Button advancedButton = new Button(this);
+        advancedButton.setText("4. STRUMENTI AVANZATI");
+        advancedButton.setOnClickListener(v -> showAdvancedTools());
+        layout.addView(advancedButton);
 
         Button startButton = new Button(this);
         startButton.setText("START CODYBOT");
@@ -87,6 +84,89 @@ public class MainActivity extends Activity {
 
         setContentView(layout);
         refreshStatus();
+    }
+
+
+    private void showAdvancedTools() {
+        final String[] options = {
+                "🔧 CALIBRA TASTIERA",
+                "🧪 TEST TASTIERA",
+                "📤 ESPORTA CALIBRAZIONE"
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle("Strumenti avanzati")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        Intent intent = new Intent("com.codybot.CALIBRATE_KEYBOARD");
+                        intent.setPackage(getPackageName());
+                        sendBroadcast(intent);
+                        status.setText("CALIBRAZIONE AVVIATA\\n\\nTocca A-Z sulla tastiera CodyCross.");
+                    } else if (which == 1) {
+                        Intent testIntent = new Intent("com.codybot.TEST_KEYBOARD");
+                        testIntent.setPackage(getPackageName());
+                        sendBroadcast(testIntent);
+                        status.setText("TEST TASTIERA AVVIATO\\n\\nCodyBot proverà a digitare A-Z.");
+                    } else {
+                        exportCalibration();
+                    }
+                })
+                .show();
+    }
+
+    private void exportCalibration() {
+        String raw = getSharedPreferences("codybot_keyboard", MODE_PRIVATE)
+                .getString("centers", null);
+        if (raw == null || raw.trim().isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Esporta calibrazione")
+                    .setMessage("Nessuna calibrazione salvata. Esegui prima CALIBRA TASTIERA.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        String[] parts = raw.split(",");
+        if (parts.length != 52) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Esporta calibrazione")
+                    .setMessage("La calibrazione salvata non è valida.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("CodyBot - Calibrazione tastiera\\n");
+        sb.append("Schermo: ")
+                .append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("width", 0))
+                .append(" x ")
+                .append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("height", 0))
+                .append("\\n\\n");
+
+        String letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (int i = 0; i < 26; i++) {
+            sb.append(letters.charAt(i))
+                    .append(" = ")
+                    .append(Math.round(Float.parseFloat(parts[i * 2])))
+                    .append(", ")
+                    .append(Math.round(Float.parseFloat(parts[i * 2 + 1])))
+                    .append("\\n");
+        }
+
+        final String exportText = sb.toString();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Calibrazione salvata")
+                .setMessage(exportText)
+                .setPositiveButton("COPIA", (d, w) -> {
+                    ClipboardManager clipboard =
+                            (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(ClipData.newPlainText("CodyBot calibrazione", exportText));
+                    status.setText("✅ COORDINATE COPIATE NEGLI APPUNTI");
+                })
+                .setNegativeButton("CHIUDI", null)
+                .show();
     }
 
     private void openOverlaySettings() {
