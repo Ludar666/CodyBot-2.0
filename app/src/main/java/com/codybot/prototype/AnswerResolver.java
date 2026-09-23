@@ -7,6 +7,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
+import java.net.URLDecoder;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
@@ -92,17 +93,60 @@ public class AnswerResolver {
     }
 
     private static String structuredSearch(String clue, int expectedLength) {
+        String direct = fetchCruciverbaUrl("https://cruciverba.io/" + buildSlug(clue), clue, expectedLength);
+        if (direct != null) return direct;
+
         HttpURLConnection c = null;
         try {
-            String slug = clue.toLowerCase()
-                    .replaceAll("[^a-z0-9\\s-]", "")
-                    .replaceAll("\\s+", "-")
-                    .replaceAll("-+", "-");
-            URL u = new URL("https://cruciverba.io/" + URLEncoder.encode(slug, "UTF-8")
-                    .replace("+", "-"));
+            String query = URLEncoder.encode("site:cruciverba.io " + clue, "UTF-8");
+            URL u = new URL("https://html.duckduckgo.com/html/?q=" + query);
             c = (HttpURLConnection) u.openConnection();
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.8");
-            c.setConnectTimeout(4500); c.setReadTimeout(4500);
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
+            c.setInstanceFollowRedirects(true);
+            if (c.getResponseCode() != 200) return null;
+
+            BufferedReader br = new BufferedReader(
+                    new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
+            StringBuilder html = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) html.append(line).append('\n');
+            br.close();
+
+            Matcher links = Pattern.compile("uddg=([^&\"]+)", Pattern.CASE_INSENSITIVE).matcher(html.toString());
+            int tried = 0;
+            while (links.find() && tried < 6) {
+                try {
+                    String link = URLDecoder.decode(links.group(1), "UTF-8");
+                    if (!link.startsWith("https://cruciverba.io/")) continue;
+                    tried++;
+                    String answer = fetchCruciverbaUrl(link, clue, expectedLength);
+                    if (answer != null) return answer;
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.disconnect();
+        }
+        return null;
+    }
+
+    private static String buildSlug(String clue) {
+        return clue.toLowerCase()
+                .replaceAll("[^a-z0-9\\s-]", "")
+                .replaceAll("\\s+", "-")
+                .replaceAll("-+", "-");
+    }
+
+    private static String fetchCruciverbaUrl(String pageUrl, String clue, int expectedLength) {
+        HttpURLConnection c = null;
+        try {
+            URL u = new URL(pageUrl);
+            c = (HttpURLConnection) u.openConnection();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.8");
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
             c.setInstanceFollowRedirects(true);
             if (c.getResponseCode() != 200) return null;
 
@@ -133,7 +177,7 @@ public class AnswerResolver {
                 relevant++;
                 if (normalizedPage.contains(normalizeText(word))) found++;
             }
-            if (relevant > 0 && found < Math.max(2, (int)Math.ceil(relevant * 0.65))) return null;
+            if (relevant > 0 && found < Math.max(1, (int)Math.ceil(relevant * 0.50))) return null;
 
             Pattern p = Pattern.compile(
                     "(?i)Risposta(?:\\s+di\\s+\\d+\\s+lettere)?\\s+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,29})\\s*\\(\\d+\\s+lettere\\)");
