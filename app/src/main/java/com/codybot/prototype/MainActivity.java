@@ -11,7 +11,6 @@ import android.app.AlertDialog;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -54,13 +53,8 @@ public class MainActivity extends Activity {
         });
         layout.addView(accessibilityButton);
 
-        Button testButton = new Button(this);
-        testButton.setText("3. AGGIORNA STATO");
-        testButton.setOnClickListener(v -> refreshStatus());
-        layout.addView(testButton);
-
         Button advancedButton = new Button(this);
-        advancedButton.setText("4. STRUMENTI AVANZATI");
+        advancedButton.setText("3. STRUMENTI AVANZATI");
         advancedButton.setOnClickListener(v -> showAdvancedTools());
         layout.addView(advancedButton);
 
@@ -82,10 +76,21 @@ public class MainActivity extends Activity {
         });
         layout.addView(stopButton);
 
+        Button closeButton = new Button(this);
+        closeButton.setText("CHIUDI CODYBOT");
+        closeButton.setOnClickListener(v -> {
+            try {
+                Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
+                serviceIntent.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);
+                startService(serviceIntent);
+            } catch (Exception ignored) {}
+            finishAffinity();
+        });
+        layout.addView(closeButton);
+
         setContentView(layout);
         refreshStatus();
     }
-
 
     private void showAdvancedTools() {
         final String[] options = {
