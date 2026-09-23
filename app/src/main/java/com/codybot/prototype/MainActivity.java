@@ -58,24 +58,6 @@ public class MainActivity extends Activity {
         advancedButton.setOnClickListener(v -> showAdvancedTools());
         layout.addView(advancedButton);
 
-        Button startButton = new Button(this);
-        startButton.setText("START CODYBOT");
-        startButton.setOnClickListener(v -> {
-            Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
-            serviceIntent.setAction(ScreenCaptureService.ACTION_START_SCAN);
-            startService(serviceIntent);
-        });
-        layout.addView(startButton);
-
-        Button stopButton = new Button(this);
-        stopButton.setText("STOP CODYBOT");
-        stopButton.setOnClickListener(v -> {
-            Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
-            serviceIntent.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);
-            startService(serviceIntent);
-        });
-        layout.addView(stopButton);
-
         Button closeButton = new Button(this);
         closeButton.setText("CHIUDI CODYBOT");
         closeButton.setOnClickListener(v -> {
