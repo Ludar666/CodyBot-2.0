@@ -110,7 +110,7 @@ public class AnswerResolver {
                     new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder();
             String line;
-            while ((line = br.readLine()) != null) html.append(line).append('
+            while ((line = br.readLine()) != null) html.append(line).append('\n');
 ');
             br.close();
 
