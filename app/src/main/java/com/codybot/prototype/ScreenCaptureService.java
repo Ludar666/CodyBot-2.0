@@ -33,7 +33,8 @@ public class ScreenCaptureService extends Service {
     private final Handler handler=new Handler(Looper.getMainLooper());
     private TextRecognizer recognizer;
     private String lastClue="";
-    private long lastScan=0;\n    private int lastAnswerLength=-1;
+    private long lastScan=0;
+    private int lastAnswerLength=-1;
 
     @Override public void onCreate(){
         super.onCreate();
@@ -112,8 +113,10 @@ public class ScreenCaptureService extends Service {
                     int top=(int)(h*.38f);
                     int bottom=(int)(h*.76f);
                     Bitmap crop=Bitmap.createBitmap(full,0,top,w,bottom-top);
+                    int answerLength=detectAnswerLength(full,w,h);
+                    lastAnswerLength=answerLength;
                     full.recycle();
-                    runOcr(crop);
+                    runOcr(crop,answerLength);
                 }catch(Exception e){
                     if(running) broadcast("ERRORE CATTURA: "+e.getClass().getSimpleName(),"");
                 }finally{
@@ -129,7 +132,8 @@ public class ScreenCaptureService extends Service {
             running=true;
             lastScan=0;
             lastClue="";
-            broadcast("🟢 SCANSIONE ATTIVA\\nIn attesa dell'indizio...","");
+            broadcast("🟢 SCANSIONE ATTIVA\
+In attesa dell'indizio...","");
         }catch(Exception e){
             broadcast("ERRORE AVVIO: "+e.getMessage(),"");
             stopScanning();
@@ -157,25 +161,35 @@ public class ScreenCaptureService extends Service {
             if(normalized.isEmpty() || normalized.equals(normalizeClue(lastClue)))return;
 
             lastClue=clue;
-            broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRicerca risposta...",clue);
+            broadcast("🟢 SCANSIONE ATTIVA
+INDIZIO: "+clue+"
+CASELLE: "+(detectedLength>0?detectedLength:"?")+"
+Ricerca risposta...",clue);
 
             String ans=AnswerResolver.resolve(this,clue,detectedLength);
 
             // Non compilare mai una risposta arrivata dopo STOP.
             if(!running)return;
 
-            if(ans!=null && !ans.startsWith("NON TROVATA") && !ans.startsWith("Nessun")\n                    && (detectedLength <= 0 || answerLetterCount(ans) == detectedLength)){
-                broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: "+ans+"\nCompilazione...",ans);
+            if(ans!=null && !ans.startsWith("NON TROVATA") && !ans.startsWith("Nessun")
+                    && (detectedLength <= 0 || answerLetterCount(ans) == detectedLength)){
+                broadcast("🟢 SCANSIONE ATTIVA
+INDIZIO: "+clue+"
+RISPOSTA: "+ans+"
+Compilazione...",ans);
                 Intent x=new Intent("com.codybot.FILL_ANSWER");
                 x.setPackage(getPackageName());
                 x.putExtra("answer",ans);
                 sendBroadcast(x);
             }else{
-                broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: NON TROVATA","");
+                broadcast("🟢 SCANSIONE ATTIVA
+INDIZIO: "+clue+"
+RISPOSTA: NON TROVATA","");
             }
         }).addOnFailureListener(e->{
             bmp.recycle();
-            if(running)broadcast("🟢 SCANSIONE ATTIVA\nOCR: ERRORE","");
+            if(running)broadcast("🟢 SCANSIONE ATTIVA
+OCR: ERRORE","");
         });
     }
 
