@@ -38,6 +38,8 @@ public class CodyAccessibilityService extends AccessibilityService {
     private TextView statusText;
     private Button startButton;
     private Button stopButton;
+    private Button calibrateButton;
+    private View calibrationView;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final List<Runnable> pendingCompilation = new ArrayList<>();
@@ -45,6 +47,9 @@ public class CodyAccessibilityService extends AccessibilityService {
     private static volatile String lastTargetPackage = "";
     private volatile float[] calibratedCenters;
     private volatile boolean calibrationInProgress = false;
+    private final String calibrationLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private int calibrationIndex = 0;
+    private float[] manualCalibrationCenters;
 
     private final Runnable overlayChecker = new Runnable() {
         @Override public void run() {
@@ -107,6 +112,7 @@ public class CodyAccessibilityService extends AccessibilityService {
 
     @Override protected void onServiceConnected() {
         super.onServiceConnected();
+        loadManualCalibration();
         try {
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"));
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.FILL_ANSWER"));
@@ -192,8 +198,14 @@ public class CodyAccessibilityService extends AccessibilityService {
             }
         });
 
+        calibrateButton = new Button(this);
+        calibrateButton.setText("CALIBRA");
+        calibrateButton.setTextSize(11);
+        calibrateButton.setOnClickListener(v -> startManualKeyboardCalibration());
+
         buttons.addView(startButton);
         buttons.addView(keyboardTestButton);
+        buttons.addView(calibrateButton);
         buttons.addView(stopButton);
         layout.addView(buttons,
                 new LinearLayout.LayoutParams(
@@ -216,6 +228,132 @@ public class CodyAccessibilityService extends AccessibilityService {
             e.printStackTrace();
             handler.postDelayed(overlayChecker, 1000);
         }
+    }
+
+    /**
+     * Calibrazione manuale: l'utente tocca realmente ogni lettera della
+     * tastiera CodyCross. Le coordinate vengono salvate e riutilizzate.
+     * Durante la calibrazione un overlay trasparente a schermo intero riceve
+     * i tocchi senza inviare il tap al gioco.
+     */
+    private void startManualKeyboardCalibration() {
+        stopCompilation();
+        if (!Settings.canDrawOverlays(this)) {
+            updateOverlayText("⚠️ Attiva prima la sovrapposizione");
+            return;
+        }
+
+        final DisplayMetrics dm = getResources().getDisplayMetrics();
+        final int screenW = dm.widthPixels;
+        final int screenH = dm.heightPixels;
+        final float[] centers = new float[52];
+        calibrationIndex = 0;
+        calibrationInProgress = true;
+
+        final FrameLayoutCompat frame = new FrameLayoutCompat(this);
+        frame.setBackgroundColor(Color.TRANSPARENT);
+        frame.setClickable(true);
+        frame.setFocusable(false);
+
+        TextView prompt = new TextView(this);
+        prompt.setTextColor(Color.WHITE);
+        prompt.setTextSize(18);
+        prompt.setGravity(Gravity.CENTER);
+        prompt.setPadding(18, 10, 18, 10);
+        prompt.setBackgroundColor(Color.parseColor("#DD000000"));
+        prompt.setText("🔧 CALIBRAZIONE TASTIERA\\n\\nTocca la lettera A");
+
+        android.widget.FrameLayout.LayoutParams promptParams =
+                new android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                        Gravity.TOP);
+        promptParams.topMargin = 55;
+        frame.addView(prompt, promptParams);
+
+        frame.setOnTouchListener((v, event) -> {
+            if (!calibrationInProgress || event == null) return true;
+            if (event.getAction() != android.view.MotionEvent.ACTION_UP) return true;
+
+            // Ignora tocchi accidentali sul pannello superiore.
+            if (event.getY() < 220) return true;
+
+            final int i = calibrationIndex;
+            if (i >= 26) return true;
+            centers[i * 2] = event.getX();
+            centers[i * 2 + 1] = event.getY();
+            calibrationIndex++;
+
+            if (calibrationIndex < 26) {
+                char next = calibrationLetters.charAt(calibrationIndex);
+                prompt.setText("🔧 CALIBRAZIONE TASTIERA\\n\\nTocca la lettera " + next
+                        + "\\n" + calibrationIndex + "/26");
+            } else {
+                manualCalibrationCenters = centers.clone();
+                saveManualCalibration(manualCalibrationCenters, screenW, screenH);
+                calibrationInProgress = false;
+                removeCalibrationOverlay();
+                calibratedCenters = manualCalibrationCenters.clone();
+                updateOverlayText("✅ CALIBRAZIONE COMPLETATA\\n26/26 tasti salvati");
+            }
+            return true;
+        });
+
+        calibrationView = frame;
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                screenW,
+                screenH,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        params.gravity = Gravity.TOP | Gravity.START;
+        try {
+            windowManager.addView(calibrationView, params);
+        } catch (Exception e) {
+            calibrationView = null;
+            calibrationInProgress = false;
+            updateOverlayText("❌ Errore calibrazione: " + e.getClass().getSimpleName());
+        }
+    }
+
+    private void removeCalibrationOverlay() {
+        removeCalibrationOverlay();
+        calibrationView = null;
+    }
+
+    private void saveManualCalibration(float[] centers, int screenW, int screenH) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < centers.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append(centers[i]);
+        }
+        getSharedPreferences("codybot_keyboard", MODE_PRIVATE)
+                .edit()
+                .putString("centers", sb.toString())
+                .putInt("width", screenW)
+                .putInt("height", screenH)
+                .apply();
+    }
+
+    private void loadManualCalibration() {
+        String raw = getSharedPreferences("codybot_keyboard", MODE_PRIVATE)
+                .getString("centers", null);
+        if (raw == null) return;
+        String[] parts = raw.split(",");
+        if (parts.length != 52) return;
+        float[] centers = new float[52];
+        try {
+            for (int i = 0; i < 52; i++) centers[i] = Float.parseFloat(parts[i]);
+            manualCalibrationCenters = centers;
+            calibratedCenters = centers.clone();
+        } catch (Exception ignored) {
+            manualCalibrationCenters = null;
+        }
+    }
+
+    private boolean hasManualCalibration() {
+        return manualCalibrationCenters != null && manualCalibrationCenters.length == 52;
     }
 
     /**
@@ -269,6 +407,14 @@ public class CodyAccessibilityService extends AccessibilityService {
 
         compiling = true;
         if (statusText != null) statusText.setText("🟢 INDIZIO/COMPILAZIONE\nRISPOSTA: " + clean);
+
+        // Se l utente ha fatto la calibrazione manuale, usiamo direttamente
+        // i punti reali salvati: non serve riconoscere la tastiera dallo screenshot.
+        if (hasManualCalibration()) {
+            calibratedCenters = manualCalibrationCenters.clone();
+            scheduleAnswerTaps(clean);
+            return;
+        }
 
         // Prima proviamo a calibrare la tastiera dalla schermata reale.
         // Se il dispositivo non supporta takeScreenshot(), usiamo il fallback.
@@ -349,6 +495,10 @@ public class CodyAccessibilityService extends AccessibilityService {
         final String row2 = "ASDFGHJKL";
         final String row3 = "ZXCVBNM";
         int idx;
+        if (manualCalibrationCenters != null && manualCalibrationCenters.length == 52) {
+            int p = calibrationLetters.indexOf(c);
+            if (p >= 0) return new float[]{manualCalibrationCenters[p * 2], manualCalibrationCenters[p * 2 + 1]};
+        }
         if (calibratedCenters != null && calibratedCenters.length >= 38) {
             if ((idx = row1.indexOf(c)) >= 0) return new float[]{calibratedCenters[idx * 2], calibratedCenters[idx * 2 + 1]};
             if ((idx = row2.indexOf(c)) >= 0) { int p = 10 + idx; return new float[]{calibratedCenters[p * 2], calibratedCenters[p * 2 + 1]}; }
