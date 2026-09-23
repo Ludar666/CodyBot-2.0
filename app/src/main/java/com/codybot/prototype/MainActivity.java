@@ -1,5 +1,7 @@
 package com.codybot.prototype;
 
+import com.codybot.app.CodyAccessibilityService;
+
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -50,7 +52,7 @@ public class MainActivity extends Activity {
         layout.addView(accessibilityButton);
 
         Button testButton = new Button(this);
-        testButton.setText("3. MOSTRA BANNER");
+        testButton.setText("3. AGGIORNA STATO");
         testButton.setOnClickListener(v -> refreshStatus());
         layout.addView(testButton);
 
