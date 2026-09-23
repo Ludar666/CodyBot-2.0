@@ -23,6 +23,7 @@ public class ScreenCaptureService extends Service {
     public static final String ACTION_TOGGLE="com.codybot.prototype.ACTION_TOGGLE";
     public static final String ACTION_START_CAPTURE="com.codybot.prototype.ACTION_START_CAPTURE";
     public static final String ACTION_STOP_CAPTURE="com.codybot.prototype.ACTION_STOP_CAPTURE";
+    public static final String ACTION_PAUSE_CAPTURE="com.codybot.prototype.ACTION_PAUSE_CAPTURE";
     public static final String EXTRA_RESULT_CODE="result_code";
     public static final String EXTRA_DATA="projection_data";
 
@@ -57,6 +58,7 @@ public class ScreenCaptureService extends Service {
             }
         }
         else if(ACTION_START_CAPTURE.equals(a)) startCapture(i);
+        else if(ACTION_PAUSE_CAPTURE.equals(a)) stopScanning();
         else if(ACTION_STOP_CAPTURE.equals(a)) stopCapture();
         updateStatus();
         return START_STICKY;
@@ -91,8 +93,13 @@ public class ScreenCaptureService extends Service {
             projection.registerCallback(new MediaProjection.Callback() {
                 @Override public void onStop() {
                     handler.post(() -> {
-                        stopScanning();
+                        running = false;
+                        lastClue = "";
+                        lastScan = 0;
+                        if (display != null) { display.release(); display = null; }
+                        if (reader != null) { reader.close(); reader = null; }
                         projection = null;
+                        broadcast("🔴 CATTURA INTERROTTA DAL SISTEMA", "");
                     });
                 }
             }, handler);
