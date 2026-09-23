@@ -34,14 +34,15 @@ public class AnswerResolver {
 
     public static String normalizeText(String text) {
         if (text == null) return "";
-        String clean = text.toLowerCase()
-                .replaceAll("(?<=[a-zàèéìòùáéíóú])0(?=[a-zàèéìòùáéíóú])", "o")
-                .replaceAll("[^a-z0-9àèéìòùáéíóú\\s]", " ")
-                .replaceAll("\\s+", " ").trim();
-        return Normalizer.normalize(clean, Normalizer.Form.NFD)
-                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        String clean = Normalizer.normalize(text, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase()
+                .replaceAll("(?<=[a-z])0(?=[a-z])", "o")
+                .replaceAll("[^a-z0-9\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return clean;
     }
-
     private static String cleanAnswer(String s) {
         if (s == null) return null;
         s = s.replaceAll("<[^>]+>", " ").replaceAll("&quot;", "\"")
