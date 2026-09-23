@@ -10,7 +10,9 @@ import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.Path;
 import android.graphics.Bitmap;
+import android.graphics.ColorSpace;
 import android.graphics.Rect;
+import android.hardware.HardwareBuffer;
 import android.os.Build;
 import android.graphics.PixelFormat;
 import android.net.Uri;
@@ -197,12 +199,21 @@ public class CodyAccessibilityService extends AccessibilityService {
                     getMainExecutor(),
                     new android.accessibilityservice.AccessibilityService.TakeScreenshotCallback() {
                         @Override public void onSuccess(android.accessibilityservice.AccessibilityService.ScreenshotResult result) {
+                            Bitmap shot = null;
                             try {
-                                calibratedCenters = detectKeyboardCenters(result.getBitmap());
+                                HardwareBuffer buffer = result.getHardwareBuffer();
+                                ColorSpace cs = result.getColorSpace();
+                                if (buffer != null) {
+                                    shot = Bitmap.wrapHardwareBuffer(buffer, cs);
+                                }
+                                calibratedCenters = detectKeyboardCenters(shot);
                             } catch (Exception ignored) {
                                 calibratedCenters = null;
                             } finally {
-                                try { result.getBitmap().recycle(); } catch (Exception ignored) {}
+                                if (shot != null) {
+                                    try { shot.recycle(); } catch (Exception ignored) {}
+                                }
+                                try { result.getHardwareBuffer().close(); } catch (Exception ignored) {}
                                 calibrationInProgress = false;
                                 scheduleAnswerTaps(clean);
                             }
