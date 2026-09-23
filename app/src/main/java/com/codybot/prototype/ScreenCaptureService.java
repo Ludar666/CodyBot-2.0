@@ -387,7 +387,14 @@ public class ScreenCaptureService extends Service {
         if(projection!=null){projection.stop();projection=null;}
     }
 
-    public static boolean isServiceRunning(){return running;}\n\n    public static boolean requestSchemaCapture(CodyAccessibilityService target){\n        if(instance==null||target==null||!running||instance.reader==null)return false;\n        instance.schemaTarget=target;\n        instance.schemaCaptureRequested=true;\n        return true;\n    }
+    public static boolean isServiceRunning(){return running;}
+
+    public static boolean requestSchemaCapture(CodyAccessibilityService target){
+        if(instance==null||target==null||!running||instance.reader==null)return false;
+        instance.schemaTarget=target;
+        instance.schemaCaptureRequested=true;
+        return true;
+    }
 
     @Nullable @Override public IBinder onBind(Intent i){return null;}
 
