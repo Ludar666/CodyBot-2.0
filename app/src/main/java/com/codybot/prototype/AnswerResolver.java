@@ -105,13 +105,6 @@ public class AnswerResolver {
                 String candidate = cleanAnswer(m.group(1));
                 if (validAnswer(candidate, expectedLength)) return candidate;
             }
-            // Fallback: look for an uppercase word/phrase immediately around the query result.
-            Pattern p2 = Pattern.compile("\\b([A-ZÀÈÉÌÒÙ]{2,20}(?:\\s+[A-ZÀÈÉÌÒÙ]{2,20})?)\\b");
-            m = p2.matcher(text);
-            while (m.find()) {
-                String candidate = cleanAnswer(m.group(1));
-                if (validAnswer(candidate, expectedLength)) return candidate;
-            }
         } catch (Exception ignored) {
         } finally { if (c != null) c.disconnect(); }
         return null;
