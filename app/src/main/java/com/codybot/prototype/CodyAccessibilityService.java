@@ -232,108 +232,19 @@ public class CodyAccessibilityService extends AccessibilityService {
             return;
         }
 
-        // Portiamo in primo piano PROPRIO CodyCross cercandolo tra le app recenti.
-        // In questo modo riprendiamo la partita già aperta, invece di lanciare
-        // una nuova istanza dalla schermata iniziale del gioco.
-        updateOverlayText("🔎 Cerco CodyCross tra le app aperte...");
-        if (!performGlobalAction(GLOBAL_ACTION_RECENTS)) {
-            updateOverlayText("⚠️ Impossibile aprire le app recenti");
-            return;
-        }
-
-        handler.postDelayed(() -> selectCodyCrossFromRecents(), 650);
-    }
-
-    private void selectCodyCrossFromRecents() {
-        AccessibilityNodeInfoMatch match = findCodyCrossNode();
-        if (match != null && match.node != null) {
-            try {
-                if (match.node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)) {
-                    updateOverlayText("🎮 CodyCross trovato. Avvio calibrazione...");
-                    handler.postDelayed(() -> showManualCalibrationOverlay(), 900);
-                    return;
-                }
-            } catch (Exception ignored) {}
-        }
-
-        // Fallback: se la scheda non espone un nodo cliccabile, proviamo
-        // l'ultima app esterna rilevata senza interrompere il flusso.
-        String targetPackage = lastTargetPackage;
-        if (targetPackage != null && !targetPackage.isEmpty()
-                && !targetPackage.equals(getPackageName())) {
-            Intent launchGame = getPackageManager().getLaunchIntentForPackage(targetPackage);
-            if (launchGame != null) {
-                launchGame.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-                try {
-                    startActivity(launchGame);
-                    handler.postDelayed(() -> showManualCalibrationOverlay(), 900);
-                    return;
-                } catch (Exception ignored) {}
-            }
-        }
-
-        updateOverlayText("⚠️ CodyCross non trovato nelle app recenti");
-    }
-
-    private static class AccessibilityNodeInfoMatch {
-        final android.view.accessibility.AccessibilityNodeInfo node;
-        AccessibilityNodeInfoMatch(android.view.accessibility.AccessibilityNodeInfo node) {
-            this.node = node;
-        }
-    }
-
-    private AccessibilityNodeInfoMatch findCodyCrossNode() {
-        try {
-            List<android.view.accessibility.AccessibilityWindowInfo> windows = getWindows();
-            for (android.view.accessibility.AccessibilityWindowInfo window : windows) {
-                android.view.accessibility.AccessibilityNodeInfo root = window.getRoot();
-                if (root == null) continue;
-
-                String pkg = root.getPackageName() == null ? "" : root.getPackageName().toString();
-                if (pkg.toLowerCase().contains("codycross")) {
-                    AccessibilityNodeInfoMatch clickable = findClickableNode(root);
-                    return clickable != null ? clickable : new AccessibilityNodeInfoMatch(root);
-                }
-
-                AccessibilityNodeInfoMatch found = findCodyCrossInNode(root);
-                if (found != null) return found;
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    private AccessibilityNodeInfoMatch findCodyCrossInNode(
-            android.view.accessibility.AccessibilityNodeInfo node) {
-        if (node == null) return null;
-
-        CharSequence text = node.getText();
-        CharSequence desc = node.getContentDescription();
-        String value = ((text == null ? "" : text.toString()) + " "
-                + (desc == null ? "" : desc.toString())).toLowerCase();
-
-        if (value.contains("codycross")) {
-            AccessibilityNodeInfoMatch clickable = findClickableNode(node);
-            return clickable != null ? clickable : new AccessibilityNodeInfoMatch(node);
-        }
-
-        for (int i = 0; i < node.getChildCount(); i++) {
-            try {
-                AccessibilityNodeInfoMatch found = findCodyCrossInNode(node.getChild(i));
-                if (found != null) return found;
-            } catch (Exception ignored) {}
-        }
-        return null;
-    }
-
-    private AccessibilityNodeInfoMatch findClickableNode(
-            android.view.accessibility.AccessibilityNodeInfo node) {
-        android.view.accessibility.AccessibilityNodeInfo current = node;
-        for (int i = 0; i < 8 && current != null; i++) {
-            if (current.isClickable()) return new AccessibilityNodeInfoMatch(current);
-            current = current.getParent();
-        }
-        return null;
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("🔧 CALIBRAZIONE TASTIERA")
+                .setMessage(
+                        "1. Apri CodyCross.\n\n" +
+                        "2. Entra in una domanda e lascia visibile tutta la tastiera.\n\n" +
+                        "3. Quando sei pronto, premi AVVIA ACQUISIZIONE.\n\n" +
+                        "CodyBot ti chiederà di toccare A, B, C... fino a Z.")
+                .setNegativeButton("ANNULLA", null)
+                .setPositiveButton("AVVIA ACQUISIZIONE", (dialog, which) -> {
+                    updateOverlayText("🔧 Preparazione calibrazione...");
+                    handler.postDelayed(() -> showManualCalibrationOverlay(), 700);
+                })
+                .show();
     }
 
     private void showManualCalibrationOverlay() {
@@ -360,7 +271,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         prompt.setGravity(Gravity.CENTER);
         prompt.setPadding(18, 10, 18, 10);
         prompt.setBackgroundColor(Color.parseColor("#DD000000"));
-        prompt.setText("🔧 CALIBRAZIONE TASTIERA\n\nTocca la lettera A");
+        prompt.setText("🔧 CALIBRAZIONE TASTIERA\n\nTocca la lettera A\n0/26");
 
         android.widget.FrameLayout.LayoutParams promptParams =
                 new android.widget.FrameLayout.LayoutParams(
@@ -393,7 +304,7 @@ public class CodyAccessibilityService extends AccessibilityService {
                 calibrationInProgress = false;
                 removeCalibrationOverlay();
                 calibratedCenters = manualCalibrationCenters.clone();
-                updateOverlayText("✅ CALIBRAZIONE COMPLETATA\\n26/26 tasti salvati");
+                updateOverlayText("✅ CALIBRAZIONE COMPLETATA\n26/26 tasti salvati");
             }
             return true;
         });
