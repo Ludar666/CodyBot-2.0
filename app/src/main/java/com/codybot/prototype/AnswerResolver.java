@@ -79,9 +79,75 @@ public class AnswerResolver {
             } catch (Exception ignored) {}
         }
 
-        String online = onlineSearch(cleanClue, expectedLength);
-        if (online != null) return online;
-        return "NON TROVATA [archivio locale + ricerca online]";
+        // Prima prova una fonte strutturata: la pagina di Cruciverba.io usa una
+        // URL deterministica per la definizione e mostra esplicitamente "Risposta".
+        // Questo è molto più sicuro del precedente parsing generico dei risultati web.
+        String structured = structuredSearch(cleanClue, expectedLength);
+        if (structured != null) return structured;
+
+        // Nessun fallback generico: se la fonte strutturata non conferma una
+        // risposta, NON restituiamo candidati presi casualmente dai risultati web.
+        // In questo modo CodyBot non può più digitare parole arbitrarie.
+        return "NON TROVATA [archivio locale + ricerca strutturata]";
+    }
+
+    private static String structuredSearch(String clue, int expectedLength) {
+        HttpURLConnection c = null;
+        try {
+            String slug = clue.toLowerCase()
+                    .replaceAll("[^a-z0-9\\s-]", "")
+                    .replaceAll("\\s+", "-")
+                    .replaceAll("-+", "-");
+            URL u = new URL("https://cruciverba.io/" + URLEncoder.encode(slug, "UTF-8")
+                    .replace("+", "-"));
+            c = (HttpURLConnection) u.openConnection();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.8");
+            c.setConnectTimeout(4500); c.setReadTimeout(4500);
+            c.setInstanceFollowRedirects(true);
+            if (c.getResponseCode() != 200) return null;
+
+            BufferedReader br = new BufferedReader(
+                    new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
+            StringBuilder html = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) html.append(line).append('\\n');
+            br.close();
+
+            String text = html.toString()
+                    .replaceAll("(?is)<script.*?</script>", " ")
+                    .replaceAll("(?is)<style.*?</style>", " ")
+                    .replaceAll("<[^>]+>", " ")
+                    .replaceAll("&nbsp;", " ")
+                    .replaceAll("&quot;", "\\"")
+                    .replaceAll("&#39;", "'")
+                    .replaceAll("&amp;", "&")
+                    .replaceAll("\\s+", " ")
+                    .trim();
+
+            // Verifica che la pagina corrisponda davvero all'indizio richiesto.
+            String normalizedPage = normalizeText(text);
+            String[] words = clue.split(" ");
+            int relevant = 0;
+            int found = 0;
+            for (String word : words) {
+                if (word.length() < 3) continue;
+                relevant++;
+                if (normalizedPage.contains(normalizeText(word))) found++;
+            }
+            if (relevant > 0 && found < Math.max(2, (int)Math.ceil(relevant * 0.65))) return null;
+
+            Pattern p = Pattern.compile(
+                    "(?i)Risposta(?:\\s+di\\s+\\d+\\s+lettere)?\\s+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,29})\\s*\\(\\d+\\s+lettere\\)");
+            Matcher m = p.matcher(text);
+            while (m.find()) {
+                String candidate = cleanAnswer(m.group(1));
+                if (validAnswer(candidate, expectedLength)) return candidate;
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.disconnect();
+        }
+        return null;
     }
 
     private static String onlineSearch(String clue, int expectedLength) {
