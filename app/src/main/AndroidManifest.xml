@@ -12,7 +12,7 @@
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.codybot.prototype.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -33,7 +33,7 @@
         </service>
 
         <service
-            android:name=".ScreenCaptureService"
+            android:name="com.codybot.prototype.ScreenCaptureService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
