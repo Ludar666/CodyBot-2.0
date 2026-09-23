@@ -75,7 +75,16 @@ public class ScreenCaptureService extends Service {
             MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
             projection=m.getMediaProjection(rc,data);
             if(projection==null) throw new IllegalStateException("MediaProjection non disponibile");
+            startScanning();
+        }catch(Exception e){
+            broadcast("ERRORE AVVIO: "+e.getMessage(),"");
+            stopCapture();
+        }
+    }
 
+    private void startScanning(){
+        if(projection==null || running) return;
+        try{
             DisplayMetrics dm=getResources().getDisplayMetrics();
             int w=dm.widthPixels,h=dm.heightPixels;
 
@@ -99,17 +108,13 @@ public class ScreenCaptureService extends Service {
                     Bitmap full=Bitmap.createBitmap(w+pad/ps,h,Bitmap.Config.ARGB_8888);
                     full.copyPixelsFromBuffer(buf);
 
-                    // Il vecchio crop era troppo stretto e poteva tagliare la domanda.
-                    // Ora includiamo tutta la fascia centrale dove CodyCross mostra l'indizio,
-                    // lasciando fuori la tastiera.
                     int top=(int)(h*.38f);
                     int bottom=(int)(h*.76f);
                     Bitmap crop=Bitmap.createBitmap(full,0,top,w,bottom-top);
                     full.recycle();
-
                     runOcr(crop);
                 }catch(Exception e){
-                    broadcast("ERRORE CATTURA: "+e.getClass().getSimpleName(),"");
+                    if(running) broadcast("ERRORE CATTURA: "+e.getClass().getSimpleName(),"");
                 }finally{
                     if(image!=null)image.close();
                 }
@@ -123,10 +128,10 @@ public class ScreenCaptureService extends Service {
             running=true;
             lastScan=0;
             lastClue="";
-            broadcast("🟢 SCANSIONE ATTIVA\nIn attesa dell'indizio...","");
+            broadcast("🟢 SCANSIONE ATTIVA\\nIn attesa dell'indizio...","");
         }catch(Exception e){
             broadcast("ERRORE AVVIO: "+e.getMessage(),"");
-            stopCapture();
+            stopScanning();
         }
     }
 
@@ -233,16 +238,18 @@ public class ScreenCaptureService extends Service {
         broadcast(running?"🟢 SCANSIONE ATTIVA":"🔴 SCANSIONE FERMA","");
     }
 
-    private void stopCapture(){
+    private void stopScanning(){
         running=false;
         lastClue="";
         lastScan=0;
-
         if(display!=null){display.release();display=null;}
         if(reader!=null){reader.close();reader=null;}
-        if(projection!=null){projection.stop();projection=null;}
-
         broadcast("🔴 SCANSIONE FERMA","");
+    }
+
+    private void stopCapture(){
+        stopScanning();
+        if(projection!=null){projection.stop();projection=null;}
     }
 
     public static boolean isServiceRunning(){return running;}
