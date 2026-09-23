@@ -82,9 +82,11 @@ public class MainActivity extends Activity {
                 "🔧 CALIBRA TASTIERA",
                 "🧪 TEST TASTIERA",
                 "📤 ESPORTA CALIBRAZIONE",
+                "📥 IMPORTA CALIBRAZIONE",
                 "📐 CALIBRA SCHEMA",
                 "🧪 TEST SCHEMA",
-                "📤 ESPORTA SCHEMA"
+                "📤 ESPORTA SCHEMA",
+                "📥 IMPORTA SCHEMI"
         };
 
         new AlertDialog.Builder(this)
@@ -103,10 +105,14 @@ public class MainActivity extends Activity {
                     } else if (which == 2) {
                         exportCalibration();
                     } else if (which == 3) {
-                        chooseSchemaLength("CALIBRAZIONE SCHEMA", "CALIBRATE_SCHEMA");
+                        importKeyboardCalibration();
                     } else if (which == 4) {
-                        chooseSchemaLength("TEST SCHEMA", "TEST_SCHEMA");
+                        chooseSchemaLength("CALIBRAZIONE SCHEMA", "CALIBRATE_SCHEMA");
                     } else if (which == 5) {
+                        chooseSchemaLength("TEST SCHEMA", "TEST_SCHEMA");
+                    } else if (which == 6) {
+                        importSchemaCalibration();
+                    } else if (which == 7) {
                         Intent intent = new Intent("com.codybot.EXPORT_SCHEMA");
                         intent.setPackage(getPackageName());
                         sendBroadcast(intent);
@@ -114,6 +120,22 @@ public class MainActivity extends Activity {
                     }
                 })
                 .show();
+    }
+
+    private void importKeyboardCalibration() {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null || !clipboard.hasPrimaryClip()) { new AlertDialog.Builder(this).setTitle("Importa calibrazione").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK", null).show(); return; }
+        CharSequence cs = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
+        final String raw = cs == null ? "" : cs.toString();
+        new AlertDialog.Builder(this).setTitle("Importa calibrazione tastiera").setMessage(raw).setPositiveButton("IMPORTA", (d,w) -> { Intent i=new Intent("com.codybot.IMPORT_KEYBOARD"); i.setPackage(getPackageName()); i.putExtra("data",raw); sendBroadcast(i); }).setNegativeButton("ANNULLA",null).show();
+    }
+
+    private void importSchemaCalibration() {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null || !clipboard.hasPrimaryClip()) { new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK", null).show(); return; }
+        CharSequence cs = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
+        final String raw = cs == null ? "" : cs.toString();
+        new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage(raw).setPositiveButton("IMPORTA", (d,w) -> { Intent i=new Intent("com.codybot.IMPORT_SCHEMA"); i.setPackage(getPackageName()); i.putExtra("data",raw); sendBroadcast(i); }).setNegativeButton("ANNULLA",null).show();
     }
 
     private void chooseSchemaLength(String title, String action) {
