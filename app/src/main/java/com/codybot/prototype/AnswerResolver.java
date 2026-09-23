@@ -12,10 +12,13 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Iterator;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;\nimport android.content.SharedPreferences;
+import java.util.regex.Pattern;
+import android.content.SharedPreferences;
 
 public class AnswerResolver {
-    private static JSONObject localDb = null;\n    private static final String PREFS="codybot_archive";\n    private static final String KEY="answers";
+    private static JSONObject localDb = null;
+    private static final String PREFS="codybot_archive";
+    private static final String KEY="answers";
 
     public static synchronized void init(Context context) {
         if (localDb != null) return;
@@ -79,8 +82,11 @@ public class AnswerResolver {
             } catch (Exception ignored) {}
         }
 
+        String cached = getLearned(context, cleanClue, expectedLength);
+        if (cached != null) return cached;
+
         String structured = structuredSearch(cleanClue, expectedLength);
-        if (structured != null) return structured;
+        if (structured != null) { saveLearned(context, cleanClue, structured); return structured; }
 
         return "NON TROVATA [archivio locale + ricerca strutturata]";
     }
@@ -104,7 +110,8 @@ public class AnswerResolver {
                     new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder();
             String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\n');
+            while ((line = br.readLine()) != null) html.append(line).append('
+');
             br.close();
 
             String text = html.toString()
