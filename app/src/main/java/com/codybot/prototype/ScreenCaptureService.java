@@ -408,6 +408,13 @@ public class ScreenCaptureService extends Service {
         if(projection!=null){projection.stop();projection=null;}
     }
 
+    public static void resetLastClue(){
+        if(instance!=null){
+            instance.lastClue="";
+            instance.lastScan=0;
+        }
+    }
+
     public static boolean isServiceRunning(){return running;}
 
     public static boolean requestSchemaCapture(CodyAccessibilityService target){
