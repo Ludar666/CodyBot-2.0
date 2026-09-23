@@ -230,6 +230,42 @@ public class CodyAccessibilityService extends AccessibilityService {
             return;
         }
 
+        // Prima portiamo in primo piano l'ultima app esterna rilevata
+        // (normalmente CodyCross). In questo modo, premendo CALIBRA da
+        // CodyBot, l'utente si ritrova direttamente sulla tastiera del gioco.
+        String targetPackage = lastTargetPackage;
+        if (targetPackage == null || targetPackage.isEmpty()
+                || targetPackage.equals(getPackageName())) {
+            updateOverlayText("⚠️ Apri prima CodyCross, poi torna qui e premi CALIBRA");
+            return;
+        }
+
+        Intent launchGame = getPackageManager().getLaunchIntentForPackage(targetPackage);
+        if (launchGame == null) {
+            updateOverlayText("⚠️ Impossibile aprire il gioco");
+            return;
+        }
+
+        launchGame.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        try {
+            startActivity(launchGame);
+        } catch (Exception e) {
+            updateOverlayText("⚠️ Impossibile aprire il gioco");
+            return;
+        }
+
+        // Aspettiamo che il gioco abbia ripreso il focus prima di mettere
+        // l'overlay di calibrazione sopra la tastiera.
+        handler.postDelayed(() -> showManualCalibrationOverlay(), 1000);
+    }
+
+    private void showManualCalibrationOverlay() {
+        if (!Settings.canDrawOverlays(this)) {
+            updateOverlayText("⚠️ Attiva prima la sovrapposizione");
+            return;
+        }
+
         final DisplayMetrics dm = getResources().getDisplayMetrics();
         final int screenW = dm.widthPixels;
         final int screenH = dm.heightPixels;
@@ -248,7 +284,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         prompt.setGravity(Gravity.CENTER);
         prompt.setPadding(18, 10, 18, 10);
         prompt.setBackgroundColor(Color.parseColor("#DD000000"));
-        prompt.setText("🔧 CALIBRAZIONE TASTIERA\\n\\nTocca la lettera A");
+        prompt.setText("🔧 CALIBRAZIONE TASTIERA\n\nTocca la lettera A");
 
         android.widget.FrameLayout.LayoutParams promptParams =
                 new android.widget.FrameLayout.LayoutParams(
@@ -273,8 +309,8 @@ public class CodyAccessibilityService extends AccessibilityService {
 
             if (calibrationIndex < 26) {
                 char next = calibrationLetters.charAt(calibrationIndex);
-                prompt.setText("🔧 CALIBRAZIONE TASTIERA\\n\\nTocca la lettera " + next
-                        + "\\n" + calibrationIndex + "/26");
+                prompt.setText("🔧 CALIBRAZIONE TASTIERA\n\nTocca la lettera " + next
+                        + "\n" + calibrationIndex + "/26");
             } else {
                 manualCalibrationCenters = centers.clone();
                 saveManualCalibration(manualCalibrationCenters, screenW, screenH);
