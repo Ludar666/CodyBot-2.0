@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.content.Intent;
 import android.media.projection.MediaProjectionManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import com.codybot.app.CodyAccessibilityService;
 
 public class MediaProjectionActivity extends Activity {
     public static final int REQUEST_CODE = 9001;
@@ -27,6 +30,25 @@ public class MediaProjectionActivity extends Activity {
             service.setAction(ScreenCaptureService.ACTION_STOP_CAPTURE);
         }
         startService(service);
+
+        // Dopo il consenso torniamo automaticamente all'app che l'utente
+        // stava usando (normalmente CodyCross), invece di lasciare in primo
+        // piano la schermata di CodyBot.
+        if (requestCode == REQUEST_CODE && resultCode == RESULT_OK) {
+            final String target = CodyAccessibilityService.getLastTargetPackage();
+            if (target != null && !target.isEmpty() && !target.equals(getPackageName())) {
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    try {
+                        Intent back = getPackageManager().getLaunchIntentForPackage(target);
+                        if (back != null) {
+                            back.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                            startActivity(back);
+                        }
+                    } catch (Exception ignored) {}
+                }, 150);
+            }
+        }
         finish();
     }
 }
