@@ -74,6 +74,15 @@ public class CodyAccessibilityService extends AccessibilityService {
             if ("com.codybot.STOP_COMPILATION".equals(intent.getAction())) {
                 stopCompilation();
             }
+
+            if ("com.codybot.TEST_KEYBOARD".equals(intent.getAction())) {
+                if (ScreenCaptureService.isServiceRunning()) {
+                    fillAnswer("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+                    updateOverlayText("🧪 TEST TASTIERA: A-Z");
+                } else {
+                    updateOverlayText("⚠️ TEST: avvia prima START");
+                }
+            }
         }
     };
 
@@ -103,6 +112,7 @@ public class CodyAccessibilityService extends AccessibilityService {
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"));
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.FILL_ANSWER"));
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.STOP_COMPILATION"));
+            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.TEST_KEYBOARD"));
         } catch (Exception e) { e.printStackTrace(); }
 
         if (!Settings.canDrawOverlays(this)) {
