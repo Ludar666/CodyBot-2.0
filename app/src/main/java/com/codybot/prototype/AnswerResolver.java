@@ -34,9 +34,6 @@ public class AnswerResolver {
 
     public static String normalizeText(String text) {
         if (text == null) return "";
-
-        // Normalizzazione pensata per la scrittura italiana e per la tastiera
-        // CodyCross: gli accenti vengono ricondotti alla vocale base.
         String clean = Normalizer.normalize(text, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}+", "")
                 .replace('ø','o').replace('Ø','O')
@@ -50,6 +47,7 @@ public class AnswerResolver {
                 .trim();
         return clean;
     }
+
     private static String cleanAnswer(String s) {
         if (s == null) return null;
         s = s.replaceAll("<[^>]+>", " ").replaceAll("&quot;", "\"")
@@ -77,14 +75,31 @@ public class AnswerResolver {
 
         if (localDb != null) {
             try {
+                // Prima prova la chiave esatta così com'è e poi, soprattutto,
+                // confronta le chiavi dell'archivio dopo la stessa normalizzazione
+                // usata sull'OCR. In questo modo "tiramisù" e "tiramisu" sono
+                // la stessa domanda per la ricerca interna.
                 if (localDb.has(cleanClue)) {
                     String ans = localDb.getString(cleanClue).toUpperCase().trim();
                     if (validAnswer(ans, expectedLength)) return ans;
                 }
+
                 Iterator<String> keys = localDb.keys();
                 while (keys.hasNext()) {
                     String key = keys.next();
-                    if (cleanClue.contains(key) || key.contains(cleanClue)) {
+                    String normalizedKey = normalizeText(key);
+                    if (normalizedKey.equals(cleanClue)) {
+                        String ans = localDb.getString(key).toUpperCase().trim();
+                        if (validAnswer(ans, expectedLength)) return ans;
+                    }
+                }
+
+                // Fallback per OCR che abbia perso una parte dell'indizio.
+                keys = localDb.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    String normalizedKey = normalizeText(key);
+                    if (cleanClue.contains(normalizedKey) || normalizedKey.contains(cleanClue)) {
                         String ans = localDb.getString(key).toUpperCase().trim();
                         if (validAnswer(ans, expectedLength)) return ans;
                     }
@@ -101,7 +116,6 @@ public class AnswerResolver {
         return "NON TROVATA [archivio locale + ricerca strutturata]";
     }
 
-    /** Search CodyCrossSoluzioni first, with Cruciverba.io as backup. */
     private static String structuredSearch(String clue, int expectedLength) {
         String answer = searchCodyCrossSoluzioni(clue, expectedLength);
         if (answer != null) return answer;
@@ -123,18 +137,13 @@ public class AnswerResolver {
             URL u = new URL("https://codycrosssoluzioni.com/wp-json/wp/v2/search?search=" + encoded + "&per_page=8");
             c = (HttpURLConnection) u.openConnection();
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/4.0");
-            c.setConnectTimeout(8000);
-            c.setReadTimeout(8000);
-            c.setInstanceFollowRedirects(true);
+            c.setConnectTimeout(8000); c.setReadTimeout(8000); c.setInstanceFollowRedirects(true);
             if (c.getResponseCode() != 200) return null;
             BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
-            StringBuilder json = new StringBuilder();
-            String line;
+            StringBuilder json = new StringBuilder(); String line;
             while ((line = br.readLine()) != null) json.append(line);
             br.close();
-
-            Matcher links = Pattern.compile("\"url\"\\s*:\\s*\"(https://codycrosssoluzioni\\.com/[^\"]+)\"",
-                    Pattern.CASE_INSENSITIVE).matcher(json.toString());
+            Matcher links = Pattern.compile("\\\"url\\\"\\s*:\\s*\\\"(https://codycrosssoluzioni\\.com/[^\\\"]+)\\\"", Pattern.CASE_INSENSITIVE).matcher(json.toString());
             int tried = 0;
             while (links.find() && tried < 8) {
                 String link = links.group(1).replace("\\/", "/");
@@ -142,10 +151,7 @@ public class AnswerResolver {
                 String answer = fetchCodyCrossUrl(link, clue, expectedLength);
                 if (answer != null) return answer;
             }
-        } catch (Exception ignored) {
-        } finally {
-            if (c != null) c.disconnect();
-        }
+        } catch (Exception ignored) {} finally { if (c != null) c.disconnect(); }
         return null;
     }
 
@@ -166,7 +172,7 @@ public class AnswerResolver {
             if (c.getResponseCode() != 200) return null;
             BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder(); String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\n');
+            while ((line = br.readLine()) != null) html.append(line).append('\\n');
             br.close();
             Matcher links = Pattern.compile("uddg=([^&\\\"]+)", Pattern.CASE_INSENSITIVE).matcher(html.toString());
             int tried = 0;
@@ -197,27 +203,19 @@ public class AnswerResolver {
             if (c.getResponseCode() != 200) return null;
             BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder(); String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\n');
+            while ((line = br.readLine()) != null) html.append(line).append('\\n');
             br.close();
-            String text = html.toString().replaceAll("(?is)<script.*?</script>", " ")
-                    .replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ")
-                    .replaceAll("&nbsp;", " ").replaceAll("&quot;", "\\\"")
-                    .replaceAll("&#39;", "'").replaceAll("&amp;", "&")
-                    .replaceAll("\\s+", " ").trim();
+            String text = html.toString().replaceAll("(?is)<script.*?</script>", " ").replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ").replaceAll("&nbsp;", " ").replaceAll("&quot;", "\\\"").replaceAll("&#39;", "'").replaceAll("&amp;", "&").replaceAll("\\s+", " ").trim();
             String normalizedPage = normalizeText(text);
             String[] words = clue.split(" "); int relevant = 0, found = 0;
             for (String word : words) { if (word.length() < 3) continue; relevant++; if (normalizedPage.contains(normalizeText(word))) found++; }
             if (relevant > 0 && found < Math.max(1, (int)Math.ceil(relevant * 0.60))) return null;
-
-            Pattern p = Pattern.compile(
-                    "(?is)La\\s+soluzione\\s+(?:è|e)\\s+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,49}?)\\s+(\\d{1,2})\\s+Lettere");
+            Pattern p = Pattern.compile("(?is)La\\s+soluzione\\s+(?:è|e)\\s+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,49}?)\\s+(\\d{1,2})\\s+Lettere");
             Matcher m = p.matcher(text);
             while (m.find()) {
-                String candidate = cleanAnswer(m.group(1));
-                int pageLength;
+                String candidate = cleanAnswer(m.group(1)); int pageLength;
                 try { pageLength = Integer.parseInt(m.group(2)); } catch (Exception ex) { pageLength = -1; }
-                if (pageLength > 0 && candidate != null
-                        && candidate.replaceAll("[^A-ZÀÈÉÌÒÙ]", "").length() != pageLength) continue;
+                if (pageLength > 0 && candidate != null && candidate.replaceAll("[^A-ZÀÈÉÌÒÙ]", "").length() != pageLength) continue;
                 if (validAnswer(candidate, expectedLength)) return candidate;
             }
         } catch (Exception ignored) {} finally { if (c != null) c.disconnect(); }
@@ -227,88 +225,36 @@ public class AnswerResolver {
     private static String fetchCruciverbaUrl(String pageUrl, String clue, int expectedLength) {
         HttpURLConnection c = null;
         try {
-            URL u = new URL(pageUrl);
-            c = (HttpURLConnection) u.openConnection();
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.8");
-            c.setConnectTimeout(8000);
-            c.setReadTimeout(8000);
-            c.setInstanceFollowRedirects(true);
+            URL u = new URL(pageUrl); c = (HttpURLConnection) u.openConnection();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.8"); c.setConnectTimeout(8000); c.setReadTimeout(8000); c.setInstanceFollowRedirects(true);
             if (c.getResponseCode() != 200) return null;
-
-            BufferedReader br = new BufferedReader(
-                    new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
-            StringBuilder html = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\n');
-            br.close();
-
-            String text = html.toString()
-                    .replaceAll("(?is)<script.*?</script>", " ")
-                    .replaceAll("(?is)<style.*?</style>", " ")
-                    .replaceAll("<[^>]+>", " ")
-                    .replaceAll("&nbsp;", " ")
-                    .replaceAll("&quot;", "\"")
-                    .replaceAll("&#39;", "'")
-                    .replaceAll("&amp;", "&")
-                    .replaceAll("\\s+", " ")
-                    .trim();
-
-            String normalizedPage = normalizeText(text);
-            String[] words = clue.split(" ");
-            int relevant = 0;
-            int found = 0;
-            for (String word : words) {
-                if (word.length() < 3) continue;
-                relevant++;
-                if (normalizedPage.contains(normalizeText(word))) found++;
-            }
+            BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8)); StringBuilder html = new StringBuilder(); String line;
+            while ((line = br.readLine()) != null) html.append(line).append('\\n'); br.close();
+            String text = html.toString().replaceAll("(?is)<script.*?</script>", " ").replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ").replaceAll("&nbsp;", " ").replaceAll("&quot;", "\\\"").replaceAll("&#39;", "'").replaceAll("&amp;", "&").replaceAll("\\s+", " ").trim();
+            String normalizedPage = normalizeText(text); String[] words = clue.split(" "); int relevant = 0, found = 0;
+            for (String word : words) { if (word.length() < 3) continue; relevant++; if (normalizedPage.contains(normalizeText(word))) found++; }
             if (relevant > 0 && found < Math.max(1, (int)Math.ceil(relevant * 0.50))) return null;
-
-            Pattern p = Pattern.compile(
-                    "(?i)Risposta(?:\\s+di\\s+\\d+\\s+lettere)?\\s+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,29})\\s*\\(\\d+\\s+lettere\\)");
-            Matcher m = p.matcher(text);
-            while (m.find()) {
-                String candidate = cleanAnswer(m.group(1));
-                if (validAnswer(candidate, expectedLength)) return candidate;
-            }
-        } catch (Exception ignored) {
-        } finally {
-            if (c != null) c.disconnect();
-        }
+            Pattern p = Pattern.compile("(?i)Risposta(?:\\s+di\\s+\\d+\\s+lettere)?\\s+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,29})\\s*\\(\\d+\\s+lettere\\)"); Matcher m = p.matcher(text);
+            while (m.find()) { String candidate = cleanAnswer(m.group(1)); if (validAnswer(candidate, expectedLength)) return candidate; }
+        } catch (Exception ignored) {} finally { if (c != null) c.disconnect(); }
         return null;
     }
 
     private static String getLearned(Context context,String clue,int expectedLength){
-        try{
-            SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
-            String json=p.getString(KEY,"{}");
-            JSONObject db=new JSONObject(json);
-            if(!db.has(clue))return null;
-            String ans=db.getString(clue);
-            return validAnswer(ans,expectedLength)?ans:null;
-        }catch(Exception ignored){return null;}
+        try { SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE); JSONObject db=new JSONObject(p.getString(KEY,"{}")); if(!db.has(clue))return null; String ans=db.getString(clue); return validAnswer(ans,expectedLength)?ans:null; }
+        catch(Exception ignored){return null;}
     }
 
     private static void saveLearned(Context context,String clue,String answer){
-        try{
-            if(!validAnswer(answer,-1))return;
-            SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
-            JSONObject db=new JSONObject(p.getString(KEY,"{}"));
-            db.put(clue,answer);
-            p.edit().putString(KEY,db.toString()).apply();
-        }catch(Exception ignored){}
+        try { if(!validAnswer(answer,-1))return; SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE); JSONObject db=new JSONObject(p.getString(KEY,"{}")); db.put(clue,answer); p.edit().putString(KEY,db.toString()).apply(); }
+        catch(Exception ignored){}
     }
 
     public static int archiveSize(Context context){
-        try{return new JSONObject(context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString(KEY,"{}")).length();}
-        catch(Exception ignored){return 0;}
+        try{return new JSONObject(context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString(KEY,"{}")).length();} catch(Exception ignored){return 0;}
     }
 
-    public static void clearLearnedArchive(Context context){
-        context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().clear().apply();
-    }
+    public static void clearLearnedArchive(Context context){ context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().clear().apply(); }
 
-    private static String onlineSearch(String clue, int expectedLength) {
-        return null;
-    }
+    private static String onlineSearch(String clue, int expectedLength) { return null; }
 }
