@@ -161,10 +161,7 @@ In attesa dell'indizio...","");
             if(normalized.isEmpty() || normalized.equals(normalizeClue(lastClue)))return;
 
             lastClue=clue;
-            broadcast("🟢 SCANSIONE ATTIVA
-INDIZIO: "+clue+"
-CASELLE: "+(detectedLength>0?detectedLength:"?")+"
-Ricerca risposta...",clue);
+            broadcast("🟢 SCANSIONE ATTIVA\\nINDIZIO: "+clue+"\\nCASELLE: "+(detectedLength>0?detectedLength:"?")+"\\nRicerca risposta...",clue);
 
             String ans=AnswerResolver.resolve(this,clue,detectedLength);
 
@@ -173,23 +170,17 @@ Ricerca risposta...",clue);
 
             if(ans!=null && !ans.startsWith("NON TROVATA") && !ans.startsWith("Nessun")
                     && (detectedLength <= 0 || answerLetterCount(ans) == detectedLength)){
-                broadcast("🟢 SCANSIONE ATTIVA
-INDIZIO: "+clue+"
-RISPOSTA: "+ans+"
-Compilazione...",ans);
+                broadcast("🟢 SCANSIONE ATTIVA\\nINDIZIO: "+clue+"\\nRISPOSTA: "+ans+"\\nCompilazione...",ans);
                 Intent x=new Intent("com.codybot.FILL_ANSWER");
                 x.setPackage(getPackageName());
                 x.putExtra("answer",ans);
                 sendBroadcast(x);
             }else{
-                broadcast("🟢 SCANSIONE ATTIVA
-INDIZIO: "+clue+"
-RISPOSTA: NON TROVATA","");
+                broadcast("🟢 SCANSIONE ATTIVA\\nINDIZIO: "+clue+"\\nRISPOSTA: NON TROVATA","");
             }
         }).addOnFailureListener(e->{
             bmp.recycle();
-            if(running)broadcast("🟢 SCANSIONE ATTIVA
-OCR: ERRORE","");
+            if(running)broadcast("🟢 SCANSIONE ATTIVA\\nOCR: ERRORE","");
         });
     }
 
