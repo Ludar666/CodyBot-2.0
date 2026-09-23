@@ -36,7 +36,7 @@ public class SchemaCalibrationService extends Service {
     private View continueOverlay;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int length;
-    private final List<List<int[]>> pages = new ArrayList<>();
+    private final List<List<List<int[]>>> pages = new ArrayList<>();
     private List<List<int[]>> currentRows = new ArrayList<>();
     private List<int[]> currentRow = new ArrayList<>();
     private boolean acquiring;
@@ -266,7 +266,7 @@ public class SchemaCalibrationService extends Service {
         out.append("CODYBOT_SCHEMA_V2|").append(length).append('\n');
         for (int p = 0; p < pages.size(); p++) {
             out.append("PAGE|").append(p + 1).append('\n');
-            List<int[]> rows = pages.get(p);
+            List<List<int[]>> rows = pages.get(p);
             for (int r = 0; r < rows.size(); r++) {
                 out.append("ROW|").append(r + 1).append('|');
                 List<int[]> row = rows.get(r);
