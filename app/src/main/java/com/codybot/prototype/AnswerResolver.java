@@ -111,7 +111,6 @@ public class AnswerResolver {
             StringBuilder html = new StringBuilder();
             String line;
             while ((line = br.readLine()) != null) html.append(line).append('\n');
-');
             br.close();
 
             String text = html.toString()
