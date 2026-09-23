@@ -87,6 +87,10 @@ public class CodyAccessibilityService extends AccessibilityService {
                     updateOverlayText("⚠️ TEST: avvia prima START");
                 }
             }
+
+            if ("com.codybot.CALIBRATE_KEYBOARD".equals(intent.getAction())) {
+                startManualKeyboardCalibration();
+            }
         }
     };
 
@@ -117,7 +121,7 @@ public class CodyAccessibilityService extends AccessibilityService {
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"));
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.FILL_ANSWER"));
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.STOP_COMPILATION"));
-            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.TEST_KEYBOARD"));
+            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.TEST_KEYBOARD"));\n            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.CALIBRATE_KEYBOARD"));
         } catch (Exception e) { e.printStackTrace(); }
 
         if (!Settings.canDrawOverlays(this)) {
@@ -174,17 +178,6 @@ public class CodyAccessibilityService extends AccessibilityService {
             }
         });
 
-        Button keyboardTestButton = new Button(this);
-        keyboardTestButton.setText("TEST");
-        keyboardTestButton.setTextSize(11);
-        keyboardTestButton.setOnClickListener(v -> {
-            if (ScreenCaptureService.isServiceRunning()) {
-                runKeyboardTest();
-            } else if (statusText != null) {
-                statusText.setText("⚠️ TEST: premi prima START");
-            }
-        });
-
         stopButton = new Button(this);
         stopButton.setText("STOP");
         stopButton.setTextSize(11);
@@ -198,14 +191,7 @@ public class CodyAccessibilityService extends AccessibilityService {
             }
         });
 
-        calibrateButton = new Button(this);
-        calibrateButton.setText("CALIBRA");
-        calibrateButton.setTextSize(11);
-        calibrateButton.setOnClickListener(v -> startManualKeyboardCalibration());
-
         buttons.addView(startButton);
-        buttons.addView(keyboardTestButton);
-        buttons.addView(calibrateButton);
         buttons.addView(stopButton);
         layout.addView(buttons,
                 new LinearLayout.LayoutParams(
@@ -318,7 +304,9 @@ public class CodyAccessibilityService extends AccessibilityService {
     }
 
     private void removeCalibrationOverlay() {
-        removeCalibrationOverlay();
+        if (calibrationView != null && windowManager != null) {
+            try { windowManager.removeView(calibrationView); } catch (Exception ignored) {}
+        }
         calibrationView = null;
     }
 
