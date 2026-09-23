@@ -16,7 +16,8 @@ import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
-import java.nio.ByteBuffer;\nimport java.text.Normalizer;
+import java.nio.ByteBuffer;
+import java.text.Normalizer;
 import java.util.ArrayList;
 
 public class ScreenCaptureService extends Service {
@@ -59,8 +60,6 @@ public class ScreenCaptureService extends Service {
         }
         else if(ACTION_TOGGLE.equals(a)){
             if(running) {
-                // STOP = pausa: manteniamo la stessa sessione MediaProjection.
-                // Cosi' START successivo non richiede di nuovo il consenso.
                 stopScanning();
             } else if(projection != null && reader != null && display != null) {
                 startScanning();
@@ -125,14 +124,11 @@ public class ScreenCaptureService extends Service {
     private void startScanning(){
         if(projection==null || running) return;
         try{
-            // STOP mette in pausa la scansione ma mantiene la sessione MediaProjection.
-            // In ripresa riutilizziamo ImageReader e VirtualDisplay esistenti:
-            // crearne un secondo con lo stesso token può terminare la cattura su Android recenti.
             if (reader != null && display != null) {
                 running = true;
                 lastScan = 0;
                 lastClue = "";
-                broadcast("🟢 SCANSIONE ATTIVA\\nIn attesa dell'indizio...","");
+                broadcast("🟢 SCANSIONE ATTIVA\nIn attesa dell'indizio...","");
                 return;
             }
 
@@ -197,9 +193,6 @@ public class ScreenCaptureService extends Service {
         InputImage input=InputImage.fromBitmap(bmp,0);
         recognizer.process(input).addOnSuccessListener(result->{
             bmp.recycle();
-
-            // Se l'utente ha premuto STOP mentre l'OCR era in corso,
-            // ignoriamo completamente il risultato arrivato in ritardo.
             if(!running)return;
 
             String clue=extractClue(result);
@@ -209,44 +202,32 @@ public class ScreenCaptureService extends Service {
             if(normalized.isEmpty() || normalized.equals(normalizeClue(lastClue)))return;
 
             lastClue=clue;
-            broadcast("🟢 SCANSIONE ATTIVA\\nINDIZIO: "+clue+"\\nCASELLE: "+(detectedLength>0?detectedLength:"?")+"\\nRicerca risposta...",clue);
+            broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nCASELLE: "+(detectedLength>0?detectedLength:"?")+"\nRicerca risposta...",clue);
 
             String ans=AnswerResolver.resolve(this,clue,detectedLength);
-
-            // Non compilare mai una risposta arrivata dopo STOP.
             if(!running)return;
 
             if(ans!=null && !ans.startsWith("NON TROVATA") && !ans.startsWith("Nessun")
                     && (detectedLength <= 0 || answerLetterCount(ans) == detectedLength)){
-                broadcast("🟢 SCANSIONE ATTIVA\\nINDIZIO: "+clue+"\\nRISPOSTA: "+ans+"\\nCompilazione...",ans);
+                broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: "+ans+"\nCompilazione...",ans);
                 Intent x=new Intent("com.codybot.FILL_ANSWER");
                 x.setPackage(getPackageName());
                 x.putExtra("answer",ans);
                 sendBroadcast(x);
             }else{
-                broadcast("🟢 SCANSIONE ATTIVA\\nINDIZIO: "+clue+"\\nRISPOSTA: NON TROVATA","");
+                broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: NON TROVATA","");
             }
         }).addOnFailureListener(e->{
             bmp.recycle();
-            if(running)broadcast("🟢 SCANSIONE ATTIVA\\nOCR: ERRORE","");
+            if(running)broadcast("🟢 SCANSIONE ATTIVA\nOCR: ERRORE","");
         });
     }
 
-    /**
-     * Estrae il testo utile dai blocchi OCR invece di usare ciecamente
-     * result.getText(). Questo evita che elementi secondari della schermata
-     * finiscano dentro la domanda.
-     */
     private int answerLetterCount(String answer){
         if(answer==null)return 0;
-        return answer.replaceAll("[^A-ZÀÈÉÌÒÙ]","").length();
+        return AnswerResolver.normalizeText(answer).replaceAll("[^a-z]","").length();
     }
 
-    /**
-     * Cerca la fila delle caselle della risposta usando i bordi verticali.
-     * Non compila se il pattern non è sufficientemente regolare: la sicurezza
-     * viene prima della velocità.
-     */
     private int detectAnswerLength(Bitmap bmp,int w,int h){
         try{
             int y0=(int)(h*.40f), y1=(int)(h*.62f);
@@ -305,10 +286,35 @@ public class ScreenCaptureService extends Service {
 
     private String normalizeOcrText(String text){
         if(text==null)return "";
+
+        // Normalizzazione pensata per il vocabolario italiano e per i limiti
+        // della tastiera CodyCross: tutti i caratteri accentati/strani che
+        // possono rappresentare una vocale italiana vengono ricondotti alla
+        // lettera base. Il testo mostrato all'utente resta quello OCR originale;
+        // questa conversione serve solo alla ricerca interna.
         String s=Normalizer.normalize(text, Normalizer.Form.NFD);
         s=s.replaceAll("\\p{M}+","");
-        s=s.replace("\u2019","'").replace("\u2018","'");
-        s=s.replace("\u2010","-").replace("\u2011","-").replace("\u2013","-").replace("\u2014","-");
+
+        s=s.replace('à','a').replace('á','a').replace('â','a').replace('ä','a').replace('ã','a')
+         .replace('À','A').replace('Á','A').replace('Â','A').replace('Ä','A').replace('Ã','A')
+         .replace('è','e').replace('é','e').replace('ê','e').replace('ë','e')
+         .replace('È','E').replace('É','E').replace('Ê','E').replace('Ë','E')
+         .replace('ì','i').replace('í','i').replace('î','i').replace('ï','i')
+         .replace('Ì','I').replace('Í','I').replace('Î','I').replace('Ï','I')
+         .replace('ò','o').replace('ó','o').replace('ô','o').replace('ö','o').replace('õ','o')
+         .replace('Ò','O').replace('Ó','O').replace('Ô','O').replace('Ö','O').replace('Õ','O')
+         .replace('ù','u').replace('ú','u').replace('û','u').replace('ü','u')
+         .replace('Ù','U').replace('Ú','U').replace('Û','U').replace('Ü','U');
+
+        s=s.replace('ç','c').replace('Ç','C')
+         .replace('ñ','n').replace('Ñ','N')
+         .replace('ø','o').replace('Ø','O')
+         .replace('ð','d').replace('Ð','D')
+         .replace('þ','t').replace('Þ','T')
+         .replace('ß','s')
+         .replace('\u2019',"'").replace('\u2018',"'")
+         .replace('\u2010',"-").replace('\u2011',"-").replace('\u2013',"-").replace('\u2014',"-");
+
         return s;
     }
 
@@ -323,18 +329,14 @@ public class ScreenCaptureService extends Service {
             value=value.replaceAll("\\s+"," ").trim();
             if(value.isEmpty())continue;
 
-            // Etichette che non fanno parte dell'indizio.
             value=value.replaceAll("(?i)\\bCodyCross\\b"," ");
             value=value.replaceAll("(?i)\\bORIZZONTALE\\b"," ");
             value=value.replaceAll("(?i)\\bVERTICALE\\b"," ");
             value=value.replaceAll("(?i)\\bINDIZIO\\b\\s*: ?"," ");
 
-            // Il banner di CodyCross contiene spesso contatori numerici (es. 999+ 209 956)
-            // che ML Kit può leggere come parte dell'indizio.
             value=value.replaceAll("(?<![A-Za-zÀ-ÖØ-öø-ÿ])(?:\\d+[+%]?\\s*){2,}", " ");
             value=value.replaceAll("(?<![A-Za-zÀ-ÖØ-öø-ÿ])\\d{2,4}(?=\\s|$)", " ");
 
-            // Correzione OCR comune: 0 letto al posto della O dentro una parola.
             value=value.replaceAll("(?i)(?<=[A-Za-zÀ-ÖØ-öø-ÿ])0(?=[A-Za-zÀ-ÖØ-öø-ÿ])","o");
             value=value.replaceAll("\\s+"," ").trim();
 
@@ -377,9 +379,6 @@ public class ScreenCaptureService extends Service {
         running=false;
         lastClue="";
         lastScan=0;
-        // Non rilasciamo MediaProjection/VirtualDisplay: STOP e' una pausa.
-        // Rilasciare il display renderebbe necessario un nuovo consenso Android
-        // per la sessione successiva su Android 14+.
         broadcast("🔴 SCANSIONE IN PAUSA","");
     }
 
