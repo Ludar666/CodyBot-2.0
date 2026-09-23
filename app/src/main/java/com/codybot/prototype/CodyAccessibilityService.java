@@ -37,6 +37,7 @@ public class CodyAccessibilityService extends AccessibilityService {
 
     private final List<Runnable> pendingCompilation = new ArrayList<>();
     private boolean compiling = false;
+    private static volatile String lastTargetPackage = "";
 
     private final Runnable overlayChecker = new Runnable() {
         @Override public void run() {
@@ -68,6 +69,21 @@ public class CodyAccessibilityService extends AccessibilityService {
             }
         }
     };
+
+    @Override public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (event == null) return;
+        CharSequence pkg = event.getPackageName();
+        if (pkg == null) return;
+        String name = pkg.toString();
+        if (!name.equals(getPackageName()) && !name.equals("android")
+                && !name.equals("com.android.systemui")) {
+            lastTargetPackage = name;
+        }
+    }
+
+    public static String getLastTargetPackage() {
+        return lastTargetPackage;
+    }
 
     @Override protected void onServiceConnected() {
         super.onServiceConnected();
@@ -126,7 +142,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         stopButton.setOnClickListener(v -> {
             stopCompilation();
             Intent intent = new Intent(this, ScreenCaptureService.class);
-            intent.setAction(ScreenCaptureService.ACTION_STOP_CAPTURE);
+            intent.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);
             try { startService(intent); }
             catch (Exception e) {
                 if (statusText != null) statusText.setText("STOP: " + e.getClass().getSimpleName());
