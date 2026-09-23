@@ -71,13 +71,18 @@ public class CodyAccessibilityService extends AccessibilityService {
     };
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (event == null) return;
-        CharSequence pkg = event.getPackageName();
-        if (pkg == null) return;
-        String name = pkg.toString();
-        if (!name.equals(getPackageName()) && !name.equals("android")
-                && !name.equals("com.android.systemui")) {
-            lastTargetPackage = name;
+        if (event != null) {
+            CharSequence pkg = event.getPackageName();
+            if (pkg != null) {
+                String name = pkg.toString();
+                if (!name.equals(getPackageName()) && !name.equals("android")
+                        && !name.equals("com.android.systemui")) {
+                    lastTargetPackage = name;
+                }
+            }
+        }
+        if (overlayView == null && Settings.canDrawOverlays(this)) {
+            handler.post(overlayChecker);
         }
     }
 
@@ -240,9 +245,6 @@ public class CodyAccessibilityService extends AccessibilityService {
         sendBroadcast(intent);
     }
 
-    @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (overlayView == null && Settings.canDrawOverlays(this)) handler.post(overlayChecker);
-    }
 
     @Override public void onInterrupt() {}
 
