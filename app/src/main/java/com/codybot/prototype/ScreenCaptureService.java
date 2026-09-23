@@ -75,55 +75,7 @@ public class ScreenCaptureService extends Service {
             MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
             projection=m.getMediaProjection(rc,data);
             if(projection==null) throw new IllegalStateException("MediaProjection non disponibile");
-
-            DisplayMetrics dm=getResources().getDisplayMetrics();
-            int w=dm.widthPixels,h=dm.heightPixels;
-
-            reader=ImageReader.newInstance(w,h,PixelFormat.RGBA_8888,2);
-            reader.setOnImageAvailableListener(r->{
-                if(!running)return;
-                Image image=null;
-                try{
-                    image=r.acquireLatestImage();
-                    if(image==null)return;
-
-                    long now=System.currentTimeMillis();
-                    if(now-lastScan<850)return;
-                    lastScan=now;
-
-                    Image.Plane p=image.getPlanes()[0];
-                    ByteBuffer buf=p.getBuffer();
-                    int ps=p.getPixelStride(), rs=p.getRowStride();
-                    int pad=rs-ps*w;
-
-                    Bitmap full=Bitmap.createBitmap(w+pad/ps,h,Bitmap.Config.ARGB_8888);
-                    full.copyPixelsFromBuffer(buf);
-
-                    // Il vecchio crop era troppo stretto e poteva tagliare la domanda.
-                    // Ora includiamo tutta la fascia centrale dove CodyCross mostra l'indizio,
-                    // lasciando fuori la tastiera.
-                    int top=(int)(h*.38f);
-                    int bottom=(int)(h*.76f);
-                    Bitmap crop=Bitmap.createBitmap(full,0,top,w,bottom-top);
-                    full.recycle();
-
-                    runOcr(crop);
-                }catch(Exception e){
-                    broadcast("ERRORE CATTURA: "+e.getClass().getSimpleName(),"");
-                }finally{
-                    if(image!=null)image.close();
-                }
-            },handler);
-
-            display=projection.createVirtualDisplay(
-                    "CodyBot",w,h,dm.densityDpi,
-                    android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                    reader.getSurface(),null,handler);
-
-            running=true;
-            lastScan=0;
-            lastClue="";
-            broadcast("🟢 SCANSIONE ATTIVA\nIn attesa dell'indizio...","");
+            startScanning();
         }catch(Exception e){
             broadcast("ERRORE AVVIO: "+e.getMessage(),"");
             stopCapture();
