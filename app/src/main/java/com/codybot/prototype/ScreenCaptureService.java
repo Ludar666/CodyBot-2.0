@@ -37,7 +37,7 @@ public class ScreenCaptureService extends Service {
     private TextRecognizer recognizer;
     private String lastClue="";
     private long lastScan=0;
-    private int lastAnswerLength=-1;
+    private int lastAnswerLength=-1; private static ScreenCaptureService instance; private volatile boolean schemaCaptureRequested=false; private volatile CodyAccessibilityService schemaTarget;
 
     @Override public void onCreate(){
         super.onCreate();
@@ -387,7 +387,7 @@ public class ScreenCaptureService extends Service {
         if(projection!=null){projection.stop();projection=null;}
     }
 
-    public static boolean isServiceRunning(){return running;}
+    public static boolean isServiceRunning(){return running;}\n\n    public static boolean requestSchemaCapture(CodyAccessibilityService target){\n        if(instance==null||target==null||!running||instance.reader==null)return false;\n        instance.schemaTarget=target;\n        instance.schemaCaptureRequested=true;\n        return true;\n    }
 
     @Nullable @Override public IBinder onBind(Intent i){return null;}
 
