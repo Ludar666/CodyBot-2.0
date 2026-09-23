@@ -1,5 +1,5 @@
 package com.codybot.app;
-import com.codybot.prototype.ScreenCaptureService;
+
 import com.codybot.prototype.ScreenCaptureService;
 
 import android.accessibilityservice.AccessibilityService;
@@ -10,9 +10,11 @@ import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.View;
@@ -29,6 +31,19 @@ public class CodyAccessibilityService extends AccessibilityService {
     private TextView statusText;
     private Button toggleButton;
     private final Handler handler = new Handler(Looper.getMainLooper());
+
+    private final Runnable overlayChecker = new Runnable() {
+        @Override
+        public void run() {
+            if (overlayView == null) {
+                if (Settings.canDrawOverlays(CodyAccessibilityService.this)) {
+                    showOverlay();
+                } else {
+                    handler.postDelayed(this, 1000);
+                }
+            }
+        }
+    };
 
     private final BroadcastReceiver overlayReceiver = new BroadcastReceiver() {
         @Override
@@ -49,15 +64,28 @@ public class CodyAccessibilityService extends AccessibilityService {
         super.onServiceConnected();
         try {
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"));
-            IntentFilter fill = new IntentFilter("com.codybot.FILL_ANSWER");
-            registerReceiver(overlayReceiver, fill);
+            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.FILL_ANSWER"));
         } catch (Exception e) {
             e.printStackTrace();
         }
-        showOverlay();
+
+        if (!Settings.canDrawOverlays(this)) {
+            try {
+                Intent settingsIntent = new Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(settingsIntent);
+            } catch (Exception ignored) {}
+        }
+
+        handler.post(overlayChecker);
     }
 
     private void showOverlay() {
+        if (overlayView != null) return;
+        if (!Settings.canDrawOverlays(this)) return;
+
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.HORIZONTAL);
@@ -65,7 +93,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         layout.setPadding(24, 12, 24, 12);
 
         statusText = new TextView(this);
-        statusText.setText("CodyBot 3.2 Pronto");
+        statusText.setText("CodyBot 3.1 PRONTO");
         statusText.setTextColor(Color.WHITE);
         statusText.setTextSize(14);
         statusText.setPadding(0, 0, 16, 0);
@@ -77,10 +105,12 @@ public class CodyAccessibilityService extends AccessibilityService {
             Intent intent = new Intent(this, ScreenCaptureService.class);
             intent.setAction(ScreenCaptureService.ACTION_TOGGLE);
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent);
-                else startService(intent);
+                // Android 11: use a normal service here. The accessibility service
+                // remains alive and handles the overlay/gestures.
+                startService(intent);
+                if (statusText != null) statusText.setText("CodyBot AVVIATO / STOP");
             } catch (Exception e) {
-                if (statusText != null) statusText.setText("Errore avvio cattura: " + e.getClass().getSimpleName());
+                if (statusText != null) statusText.setText("Errore: " + e.getClass().getSimpleName());
             }
         });
 
@@ -95,15 +125,17 @@ public class CodyAccessibilityService extends AccessibilityService {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        params.y = 100;
-        try { windowManager.addView(overlayView, params); } catch (Exception e) { e.printStackTrace(); }
+        params.y = 70;
+
+        try {
+            windowManager.addView(overlayView, params);
+        } catch (Exception e) {
+            overlayView = null;
+            e.printStackTrace();
+            handler.postDelayed(overlayChecker, 1000);
+        }
     }
 
-    /**
-     * CodyCross keyboard layout used on the Mi 9T. Coordinates are relative to
-     * the full display so they continue to work if the resolution/density changes.
-     * Row 1: QWERTYUIOP, row 2: ASDFGHJKL, row 3: ZXCVBNM.
-     */
     private void fillAnswer(String answer) {
         final String clean = answer.toUpperCase().replaceAll("[^A-Z]", "");
         if (clean.isEmpty()) return;
@@ -147,15 +179,22 @@ public class CodyAccessibilityService extends AccessibilityService {
         sendBroadcast(intent);
     }
 
-    @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
+    @Override public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (overlayView == null && Settings.canDrawOverlays(this)) {
+            handler.post(overlayChecker);
+        }
+    }
+
     @Override public void onInterrupt() {}
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacks(overlayChecker);
         super.onDestroy();
         try { unregisterReceiver(overlayReceiver); } catch (Exception ignored) {}
         if (overlayView != null && windowManager != null) {
             try { windowManager.removeView(overlayView); } catch (Exception ignored) {}
         }
+        overlayView = null;
     }
 }
