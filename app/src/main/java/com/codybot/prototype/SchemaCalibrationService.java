@@ -257,7 +257,7 @@ public class SchemaCalibrationService extends Service {
 
     private int countRows() {
         int n = 0;
-        for (List<int[]> page : pages) n += page.size();
+        for (List<List<int[]>> page : pages) n += page.size();
         return n;
     }
 
