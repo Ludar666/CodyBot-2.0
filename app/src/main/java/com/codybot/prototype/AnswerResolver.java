@@ -103,7 +103,42 @@ public class AnswerResolver {
     private static String searchCodyCrossSoluzioni(String clue, int expectedLength) {
         String direct = fetchCodyCrossUrl("https://codycrosssoluzioni.com/" + buildSlug(clue), clue, expectedLength);
         if (direct != null) return direct;
+        String api = searchCodyCrossWordPress(clue, expectedLength);
+        if (api != null) return api;
         return searchDomain("site:codycrosssoluzioni.com " + clue, "codycrosssoluzioni.com", clue, expectedLength, true);
+    }
+
+    private static String searchCodyCrossWordPress(String clue, int expectedLength) {
+        HttpURLConnection c = null;
+        try {
+            String encoded = URLEncoder.encode(clue, "UTF-8");
+            URL u = new URL("https://codycrosssoluzioni.com/wp-json/wp/v2/search?search=" + encoded + "&per_page=8");
+            c = (HttpURLConnection) u.openConnection();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/4.0");
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
+            c.setInstanceFollowRedirects(true);
+            if (c.getResponseCode() != 200) return null;
+            BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
+            StringBuilder json = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) json.append(line);
+            br.close();
+
+            Matcher links = Pattern.compile("\"url\"\\s*:\\s*\"(https://codycrosssoluzioni\\.com/[^\"]+)\"",
+                    Pattern.CASE_INSENSITIVE).matcher(json.toString());
+            int tried = 0;
+            while (links.find() && tried < 8) {
+                String link = links.group(1).replace("\\/", "/");
+                tried++;
+                String answer = fetchCodyCrossUrl(link, clue, expectedLength);
+                if (answer != null) return answer;
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.disconnect();
+        }
+        return null;
     }
 
     private static String searchCruciverba(String clue, int expectedLength) {
@@ -166,9 +201,17 @@ public class AnswerResolver {
             for (String word : words) { if (word.length() < 3) continue; relevant++; if (normalizedPage.contains(normalizeText(word))) found++; }
             if (relevant > 0 && found < Math.max(1, (int)Math.ceil(relevant * 0.60))) return null;
 
-            Pattern p = Pattern.compile("(?is)La soluzione e.{0,120}?[\\r\\n ]+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,49})[\\r\\n ]+\\d+\\s+Lettere");
+            Pattern p = Pattern.compile(
+                    "(?is)La\\s+soluzione\\s+(?:è|e)\\s+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,49}?)\\s+(\\d{1,2})\\s+Lettere");
             Matcher m = p.matcher(text);
-            while (m.find()) { String candidate = cleanAnswer(m.group(1)); if (validAnswer(candidate, expectedLength)) return candidate; }
+            while (m.find()) {
+                String candidate = cleanAnswer(m.group(1));
+                int pageLength;
+                try { pageLength = Integer.parseInt(m.group(2)); } catch (Exception ex) { pageLength = -1; }
+                if (pageLength > 0 && candidate != null
+                        && candidate.replaceAll("[^A-ZÀÈÉÌÒÙ]", "").length() != pageLength) continue;
+                if (validAnswer(candidate, expectedLength)) return candidate;
+            }
         } catch (Exception ignored) {} finally { if (c != null) c.disconnect(); }
         return null;
     }
