@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
         closeButton.setText("CHIUDI CODYBOT");
         closeButton.setOnClickListener(v -> {
             try {
-                Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
+                Intent hideIntent = new Intent("com.codybot.HIDE_OVERLAY");\n                hideIntent.setPackage(getPackageName());\n                sendBroadcast(hideIntent);\n                Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
                 serviceIntent.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);
                 startService(serviceIntent);
             } catch (Exception ignored) {}
