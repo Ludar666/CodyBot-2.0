@@ -32,7 +32,7 @@ public class ScreenCaptureService extends Service {
     private final Handler handler=new Handler(Looper.getMainLooper());
     private TextRecognizer recognizer;
     private String lastClue="";
-    private long lastScan=0;
+    private long lastScan=0;\n    private int lastAnswerLength=-1;
 
     @Override public void onCreate(){
         super.onCreate();
@@ -135,7 +135,7 @@ public class ScreenCaptureService extends Service {
         }
     }
 
-    private void runOcr(Bitmap bmp){
+    private void runOcr(Bitmap bmp,int detectedLength){
         if(!running){
             bmp.recycle();
             return;
@@ -158,12 +158,12 @@ public class ScreenCaptureService extends Service {
             lastClue=clue;
             broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRicerca risposta...",clue);
 
-            String ans=AnswerResolver.resolve(this,clue,-1);
+            String ans=AnswerResolver.resolve(this,clue,detectedLength);
 
             // Non compilare mai una risposta arrivata dopo STOP.
             if(!running)return;
 
-            if(ans!=null && !ans.startsWith("Non in archivio") && !ans.startsWith("Nessun")){
+            if(ans!=null && !ans.startsWith("NON TROVATA") && !ans.startsWith("Nessun")\n                    && (detectedLength <= 0 || answerLetterCount(ans) == detectedLength)){
                 broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: "+ans+"\nCompilazione...",ans);
                 Intent x=new Intent("com.codybot.FILL_ANSWER");
                 x.setPackage(getPackageName());
@@ -183,6 +183,72 @@ public class ScreenCaptureService extends Service {
      * result.getText(). Questo evita che elementi secondari della schermata
      * finiscano dentro la domanda.
      */
+    private int answerLetterCount(String answer){
+        if(answer==null)return 0;
+        return answer.replaceAll("[^A-ZÀÈÉÌÒÙ]","").length();
+    }
+
+    /**
+     * Cerca la fila delle caselle della risposta usando i bordi verticali.
+     * Non compila se il pattern non è sufficientemente regolare: la sicurezza
+     * viene prima della velocità.
+     */
+    private int detectAnswerLength(Bitmap bmp,int w,int h){
+        try{
+            int y0=(int)(h*.40f), y1=(int)(h*.62f);
+            int[] score=new int[w];
+            for(int x=1;x<w-1;x++){
+                int hits=0;
+                for(int y=y0;y<y1;y+=2){
+                    int a=lum(bmp.getPixel(x-1,y));
+                    int b=lum(bmp.getPixel(x,y));
+                    int c=lum(bmp.getPixel(x+1,y));
+                    if(Math.abs(b-a)>38 || Math.abs(c-b)>38) hits++;
+                }
+                score[x]=hits;
+            }
+            ArrayList<Integer> peaks=new ArrayList<>();
+            int threshold=Math.max(5,(y1-y0)/10);
+            boolean in=false; int start=0;
+            for(int x=1;x<w-1;x++){
+                if(score[x]>=threshold){ if(!in){in=true;start=x;} }
+                else if(in){
+                    int end=x-1;
+                    int best=start;
+                    for(int k=start;k<=end;k++) if(score[k]>score[best]) best=k;
+                    peaks.add(best); in=false;
+                }
+            }
+            if(in)peaks.add(start);
+            if(peaks.size()<3)return -1;
+
+            int bestCount=-1;
+            for(int i=0;i<peaks.size();i++){
+                for(int j=i+2;j<peaks.size();j++){
+                    int span=peaks.get(j)-peaks.get(i);
+                    int n=j-i;
+                    if(span<90 || span>Math.min(1800,w*.92))continue;
+                    double pitch=(double)span/n;
+                    if(pitch<18 || pitch>180)continue;
+                    int count=0;
+                    for(int k=i;k<=j;k++){
+                        double expected=peaks.get(i)+(k-i)*pitch;
+                        if(Math.abs(peaks.get(k)-expected)<=pitch*.28)count++;
+                    }
+                    if(count==n+1 && n>=2 && n<=15){
+                        int slots=n;
+                        if(slots>bestCount)bestCount=slots;
+                    }
+                }
+            }
+            return (bestCount>=2 && bestCount<=15)?bestCount:-1;
+        }catch(Exception ignored){ return -1; }
+    }
+
+    private int lum(int color){
+        return (int)(0.299f*((color>>16)&255)+0.587f*((color>>8)&255)+0.114f*(color&255));
+    }
+
     private String extractClue(Text result){
         StringBuilder out=new StringBuilder();
 
