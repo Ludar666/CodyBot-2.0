@@ -42,6 +42,7 @@ public class ScreenCaptureService extends Service {
 
     @Override public void onCreate(){
         super.onCreate();
+        instance=this;
         recognizer=TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
         startForeground(11, notification());
     }
@@ -429,6 +430,7 @@ public class ScreenCaptureService extends Service {
     @Override public void onDestroy(){
         stopCapture();
         if(recognizer!=null)recognizer.close();
+        if(instance==this) instance=null;
         super.onDestroy();
     }
 }
