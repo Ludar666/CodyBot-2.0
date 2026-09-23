@@ -292,7 +292,8 @@ public class CodyAccessibilityService extends AccessibilityService {
 
                 String pkg = root.getPackageName() == null ? "" : root.getPackageName().toString();
                 if (pkg.toLowerCase().contains("codycross")) {
-                    return new AccessibilityNodeInfoMatch(root);
+                    AccessibilityNodeInfoMatch clickable = findClickableNode(root);
+                    return clickable != null ? clickable : new AccessibilityNodeInfoMatch(root);
                 }
 
                 AccessibilityNodeInfoMatch found = findCodyCrossInNode(root);
@@ -312,7 +313,8 @@ public class CodyAccessibilityService extends AccessibilityService {
                 + (desc == null ? "" : desc.toString())).toLowerCase();
 
         if (value.contains("codycross")) {
-            return new AccessibilityNodeInfoMatch(node);
+            AccessibilityNodeInfoMatch clickable = findClickableNode(node);
+            return clickable != null ? clickable : new AccessibilityNodeInfoMatch(node);
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
@@ -320,6 +322,16 @@ public class CodyAccessibilityService extends AccessibilityService {
                 AccessibilityNodeInfoMatch found = findCodyCrossInNode(node.getChild(i));
                 if (found != null) return found;
             } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    private AccessibilityNodeInfoMatch findClickableNode(
+            android.view.accessibility.AccessibilityNodeInfo node) {
+        android.view.accessibility.AccessibilityNodeInfo current = node;
+        for (int i = 0; i < 8 && current != null; i++) {
+            if (current.isClickable()) return new AccessibilityNodeInfoMatch(current);
+            current = current.getParent();
         }
         return null;
     }
