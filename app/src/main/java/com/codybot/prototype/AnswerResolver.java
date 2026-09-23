@@ -93,51 +93,84 @@ public class AnswerResolver {
         return "NON TROVATA [archivio locale + ricerca strutturata]";
     }
 
+    /** Search CodyCrossSoluzioni first, with Cruciverba.io as backup. */
     private static String structuredSearch(String clue, int expectedLength) {
+        String answer = searchCodyCrossSoluzioni(clue, expectedLength);
+        if (answer != null) return answer;
+        return searchCruciverba(clue, expectedLength);
+    }
+
+    private static String searchCodyCrossSoluzioni(String clue, int expectedLength) {
+        String direct = fetchCodyCrossUrl("https://codycrosssoluzioni.com/" + buildSlug(clue), clue, expectedLength);
+        if (direct != null) return direct;
+        return searchDomain("site:codycrosssoluzioni.com " + clue, "codycrosssoluzioni.com", clue, expectedLength, true);
+    }
+
+    private static String searchCruciverba(String clue, int expectedLength) {
         String direct = fetchCruciverbaUrl("https://cruciverba.io/" + buildSlug(clue), clue, expectedLength);
         if (direct != null) return direct;
+        return searchDomain("site:cruciverba.io " + clue, "cruciverba.io", clue, expectedLength, false);
+    }
 
+    private static String searchDomain(String query, String domain, String clue, int expectedLength, boolean codySite) {
         HttpURLConnection c = null;
         try {
-            String query = URLEncoder.encode("site:cruciverba.io " + clue, "UTF-8");
-            URL u = new URL("https://html.duckduckgo.com/html/?q=" + query);
+            String encoded = URLEncoder.encode(query, "UTF-8");
+            URL u = new URL("https://html.duckduckgo.com/html/?q=" + encoded);
             c = (HttpURLConnection) u.openConnection();
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.8");
-            c.setConnectTimeout(8000);
-            c.setReadTimeout(8000);
-            c.setInstanceFollowRedirects(true);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/4.0");
+            c.setConnectTimeout(8000); c.setReadTimeout(8000); c.setInstanceFollowRedirects(true);
             if (c.getResponseCode() != 200) return null;
-
-            BufferedReader br = new BufferedReader(
-                    new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
-            StringBuilder html = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\n');
+            BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
+            StringBuilder html = new StringBuilder(); String line;
+            while ((line = br.readLine()) != null) html.append(line).append('\\n');
             br.close();
-
-            Matcher links = Pattern.compile("uddg=([^&\"]+)", Pattern.CASE_INSENSITIVE).matcher(html.toString());
+            Matcher links = Pattern.compile("uddg=([^&\\\"]+)", Pattern.CASE_INSENSITIVE).matcher(html.toString());
             int tried = 0;
-            while (links.find() && tried < 6) {
+            while (links.find() && tried < 8) {
                 try {
                     String link = URLDecoder.decode(links.group(1), "UTF-8");
-                    if (!link.startsWith("https://cruciverba.io/")) continue;
+                    if (!link.startsWith("https://" + domain + "/")) continue;
                     tried++;
-                    String answer = fetchCruciverbaUrl(link, clue, expectedLength);
+                    String answer = codySite ? fetchCodyCrossUrl(link, clue, expectedLength) : fetchCruciverbaUrl(link, clue, expectedLength);
                     if (answer != null) return answer;
                 } catch (Exception ignored) {}
             }
-        } catch (Exception ignored) {
-        } finally {
-            if (c != null) c.disconnect();
-        }
+        } catch (Exception ignored) {} finally { if (c != null) c.disconnect(); }
         return null;
     }
 
     private static String buildSlug(String clue) {
-        return clue.toLowerCase()
-                .replaceAll("[^a-z0-9\\s-]", "")
-                .replaceAll("\\s+", "-")
-                .replaceAll("-+", "-");
+        return normalizeText(clue).replaceAll("[^a-z0-9\\\\s-]", "").replaceAll("\\\\s+", "-").replaceAll("-+", "-");
+    }
+
+    private static String fetchCodyCrossUrl(String pageUrl, String clue, int expectedLength) {
+        HttpURLConnection c = null;
+        try {
+            URL u = new URL(pageUrl);
+            c = (HttpURLConnection) u.openConnection();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/4.0");
+            c.setConnectTimeout(8000); c.setReadTimeout(8000); c.setInstanceFollowRedirects(true);
+            if (c.getResponseCode() != 200) return null;
+            BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
+            StringBuilder html = new StringBuilder(); String line;
+            while ((line = br.readLine()) != null) html.append(line).append('\\n');
+            br.close();
+            String text = html.toString().replaceAll("(?is)<script.*?</script>", " ")
+                    .replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ")
+                    .replaceAll("&nbsp;", " ").replaceAll("&quot;", "\\\"")
+                    .replaceAll("&#39;", "'").replaceAll("&amp;", "&")
+                    .replaceAll("\\\\s+", " ").trim();
+            String normalizedPage = normalizeText(text);
+            String[] words = clue.split(" "); int relevant = 0, found = 0;
+            for (String word : words) { if (word.length() < 3) continue; relevant++; if (normalizedPage.contains(normalizeText(word))) found++; }
+            if (relevant > 0 && found < Math.max(1, (int)Math.ceil(relevant * 0.60))) return null;
+
+            Pattern p = Pattern.compile("(?is)La soluzione e.{0,120}?[\\r\\n ]+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,49})[\\r\\n ]+\\d+\\s+Lettere");
+            Matcher m = p.matcher(text);
+            while (m.find()) { String candidate = cleanAnswer(m.group(1)); if (validAnswer(candidate, expectedLength)) return candidate; }
+        } catch (Exception ignored) {} finally { if (c != null) c.disconnect(); }
+        return null;
     }
 
     private static String fetchCruciverbaUrl(String pageUrl, String clue, int expectedLength) {
