@@ -132,8 +132,7 @@ public class ScreenCaptureService extends Service {
             running=true;
             lastScan=0;
             lastClue="";
-            broadcast("🟢 SCANSIONE ATTIVA\
-In attesa dell'indizio...","");
+            broadcast("🟢 SCANSIONE ATTIVA\nIn attesa dell'indizio...","");
         }catch(Exception e){
             broadcast("ERRORE AVVIO: "+e.getMessage(),"");
             stopScanning();
