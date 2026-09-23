@@ -71,7 +71,7 @@ public class MainActivity extends Activity {
         startButton.setText("START CODYBOT");
         startButton.setOnClickListener(v -> {
             Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
-            serviceIntent.setAction(ScreenCaptureService.ACTION_TOGGLE);
+            serviceIntent.setAction(ScreenCaptureService.ACTION_START_SCAN);
             startService(serviceIntent);
         });
         layout.addView(startButton);
