@@ -79,15 +79,9 @@ public class AnswerResolver {
             } catch (Exception ignored) {}
         }
 
-        // Prima prova una fonte strutturata: la pagina di Cruciverba.io usa una
-        // URL deterministica per la definizione e mostra esplicitamente "Risposta".
-        // Questo è molto più sicuro del precedente parsing generico dei risultati web.
         String structured = structuredSearch(cleanClue, expectedLength);
         if (structured != null) return structured;
 
-        // Nessun fallback generico: se la fonte strutturata non conferma una
-        // risposta, NON restituiamo candidati presi casualmente dai risultati web.
-        // In questo modo CodyBot non può più digitare parole arbitrarie.
         return "NON TROVATA [archivio locale + ricerca strutturata]";
     }
 
@@ -110,7 +104,7 @@ public class AnswerResolver {
                     new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder();
             String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\\n');
+            while ((line = br.readLine()) != null) html.append(line).append('\n');
             br.close();
 
             String text = html.toString()
@@ -118,13 +112,12 @@ public class AnswerResolver {
                     .replaceAll("(?is)<style.*?</style>", " ")
                     .replaceAll("<[^>]+>", " ")
                     .replaceAll("&nbsp;", " ")
-                    .replaceAll("&quot;", "\\"")
+                    .replaceAll("&quot;", "\"")
                     .replaceAll("&#39;", "'")
                     .replaceAll("&amp;", "&")
                     .replaceAll("\\s+", " ")
                     .trim();
 
-            // Verifica che la pagina corrisponda davvero all'indizio richiesto.
             String normalizedPage = normalizeText(text);
             String[] words = clue.split(" ");
             int relevant = 0;
@@ -151,28 +144,6 @@ public class AnswerResolver {
     }
 
     private static String onlineSearch(String clue, int expectedLength) {
-        HttpURLConnection c = null;
-        try {
-            String q = URLEncoder.encode("CodyCross soluzione " + clue + " " + (expectedLength > 0 ? expectedLength + " lettere" : ""), "UTF-8");
-            URL u = new URL("https://html.duckduckgo.com/html/?q=" + q);
-            c = (HttpURLConnection) u.openConnection();
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.8");
-            c.setConnectTimeout(4500); c.setReadTimeout(4500); c.setInstanceFollowRedirects(true);
-            if (c.getResponseCode() != 200) return null;
-            BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
-            StringBuilder html = new StringBuilder(); String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\n');
-            br.close();
-            String text = html.toString().replaceAll("<[^>]+>", " ").replaceAll("&quot;", "\"")
-                    .replaceAll("&#x27;", "'").replaceAll("&amp;", "&").replaceAll("\\s+", " ");
-            Pattern p = Pattern.compile("(?i)(?:risposta|soluzione)[^A-ZÀÈÉÌÒÙ]{0,12}([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ' -]{1,29})");
-            Matcher m = p.matcher(text);
-            while (m.find()) {
-                String candidate = cleanAnswer(m.group(1));
-                if (validAnswer(candidate, expectedLength)) return candidate;
-            }
-        } catch (Exception ignored) {
-        } finally { if (c != null) c.disconnect(); }
         return null;
     }
 }
