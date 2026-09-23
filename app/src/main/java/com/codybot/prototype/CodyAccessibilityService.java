@@ -84,7 +84,16 @@ public class CodyAccessibilityService extends AccessibilityService {
 
   updateOverlayText("🟢 COMPILAZIONE\nRISPOSTA: "+clean+"\nSchema trovato - controllo lettere...");
   processSchemaCell(source,clean,centers,0,half,found,()->{
-    scheduleAnswerTaps(clean,found);
+    // Safety: never blindly type the whole answer if the schema position
+    // detection produced no positive match.
+    if(found.isEmpty()){
+      updateOverlayText("⚠️ Schema non riconosciuto con sufficiente sicurezza\\nNessuna lettera confermata: non digito.");
+      compiling=false;
+      pendingCompilation.clear();
+      calibratedCenters=null;
+    }else{
+      scheduleAnswerTaps(clean,found);
+    }
     try{source.recycle();}catch(Exception ignored){}
   });
  }
@@ -158,7 +167,31 @@ public class CodyAccessibilityService extends AccessibilityService {
   }
   return sum;
  }
- private void processSchemaCell(Bitmap b,String clean,int[] centers,int index,int half,java.util.Set<Integer> found,Runnable done){if(index>=clean.length()){done.run();return;}final int sw=b.getWidth(),sh=b.getHeight(),cx=centers[index*2],cy=centers[index*2+1];final int left=Math.max(0,cx-half),top=Math.max(0,cy-half),right=Math.min(sw,cx+half),bottom=Math.min(sh,cy+half);if(right<=left||bottom<=top){processSchemaCell(b,clean,centers,index+1,half,found,done);return;}final Bitmap cell=Bitmap.createBitmap(b,left,top,right-left,bottom-top);InputImage image=InputImage.fromBitmap(cell,0);recognizer.process(image).addOnSuccessListener(result->{boolean letter=false;for(Text.TextBlock block:result.getTextBlocks())for(Text.Line line:block.getLines())for(Text.Element el:line.getElements()){String t=el.getText()==null?"":el.getText().toUpperCase().replaceAll("[^A-Z]","");if(!t.isEmpty()){letter=true;break;}}if(letter)found.add(index);try{cell.recycle();}catch(Exception ignored){}processSchemaCell(b,clean,centers,index+1,half,found,done);}).addOnFailureListener(e->{try{cell.recycle();}catch(Exception ignored){}processSchemaCell(b,clean,centers,index+1,half,found,done);});}
+ private void processSchemaCell(Bitmap b,String clean,int[] centers,int index,int half,java.util.Set<Integer> found,Runnable done){
+  if(index>=clean.length()){done.run();return;}
+  final int sw=b.getWidth(),sh=b.getHeight(),cx=centers[index*2],cy=centers[index*2+1];
+  final int left=Math.max(0,cx-half),top=Math.max(0,cy-half),right=Math.min(sw,cx+half),bottom=Math.min(sh,cy+half);
+  if(right<=left||bottom<=top){processSchemaCell(b,clean,centers,index+1,half,found,done);return;}
+  final Bitmap cell=Bitmap.createBitmap(b,left,top,right-left,bottom-top);
+  InputImage image=InputImage.fromBitmap(cell,0);
+  recognizer.process(image).addOnSuccessListener(result->{
+    boolean letter=false;
+    char expected=clean.charAt(index);
+    for(Text.TextBlock block:result.getTextBlocks())
+      for(Text.Line line:block.getLines())
+        for(Text.Element el:line.getElements()){
+          String t=el.getText()==null?"":el.getText().toUpperCase().replaceAll("[^A-Z]","");
+          // Only accept OCR that contains the letter expected at this position.
+          if(t.indexOf(expected)>=0){letter=true;break;}
+        }
+    if(letter)found.add(index);
+    try{cell.recycle();}catch(Exception ignored){}
+    processSchemaCell(b,clean,centers,index+1,half,found,done);
+  }).addOnFailureListener(e->{
+    try{cell.recycle();}catch(Exception ignored){}
+    processSchemaCell(b,clean,centers,index+1,half,found,done);
+  });
+ }
  private int lum(int color){
   return (299*Color.red(color)+587*Color.green(color)+114*Color.blue(color))/1000;
  }
@@ -177,7 +210,11 @@ public class CodyAccessibilityService extends AccessibilityService {
  }
  private void hideOverlay(){overlayHidden=true;stopCompilation();handler.removeCallbacks(overlayChecker);removeCalibrationOverlay();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;statusText=null;try{stopService(new Intent(this,ScreenCaptureService.class));}catch(Exception ignored){}handler.postDelayed(()->{try{disableSelf();}catch(Exception ignored){}},150);}
  private java.util.Set<Integer> alignDetectedLetters(String clean,java.util.List<Character> detected){java.util.Set<Integer> matched=new java.util.HashSet<Integer>();if(detected==null||detected.isEmpty())return matched;int n=clean.length(),m=detected.size();int[][] dp=new int[n+1][m+1];for(int i=1;i<=n;i++)for(int j=1;j<=m;j++){int best=Math.max(dp[i-1][j],dp[i][j-1]);if(clean.charAt(i-1)==detected.get(j-1))best=Math.max(best,dp[i-1][j-1]+1);dp[i][j]=best;}int i=n,j=m;while(i>0&&j>0){if(clean.charAt(i-1)==detected.get(j-1)&&dp[i][j]==dp[i-1][j-1]+1){matched.add(i-1);i--;j--;}else if(dp[i-1][j]>=dp[i][j-1])i--;else j--;}return matched;}
- private void scheduleAnswerTaps(String clean,java.util.Set<Integer> existing){if(!compiling)return;DisplayMetrics dm=getResources().getDisplayMetrics();float w=dm.widthPixels,h=dm.heightPixels;int index=0,skipped=0;for(int i=0;i<clean.length();i++){if(existing.contains(i)){skipped++;continue;}final char c=clean.charAt(i);final float[] xy=calibratedKeyCenter(c,w,h);if(xy==null)continue;final long d=index*240L;index++;Runnable r=()->{if(compiling&&ScreenCaptureService.isServiceRunning())tap(xy[0],xy[1]);};pendingCompilation.add(r);handler.postDelayed(r,d);}final int n=clean.length(),s=skipped;Runnable f=()->{if(!compiling)return;compiling=false;pendingCompilation.clear();updateOverlayText("✅ COMPILATA: "+clean+"\nGià presenti: "+s+"/"+n);calibratedCenters=null;};pendingCompilation.add(f);handler.postDelayed(f,Math.max(300,index*240L+300L));}
+ private void scheduleAnswerTaps(String clean,java.util.Set<Integer> existing){if(!compiling)return;DisplayMetrics dm=getResources().getDisplayMetrics();float w=dm.widthPixels,h=dm.heightPixels;int index=0,skipped=0;for(int i=0;i<clean.length();i++){if(existing.contains(i)){skipped++;continue;}final char c=clean.charAt(i);final float[] xy=calibratedKeyCenter(c,w,h);if(xy==null)continue;final long d=index*240L;index++;Runnable r=()->{if(compiling&&ScreenCaptureService.isServiceRunning())tap(xy[0],xy[1]);};pendingCompilation.add(r);handler.postDelayed(r,d);}final int n=clean.length(),s=skipped;Runnable f=()->{if(!compiling)return;compiling=false;pendingCompilation.clear();calibratedCenters=null;
+    Intent reset=new Intent("com.codybot.RESET_CLUE");
+    reset.setPackage(getPackageName());
+    sendBroadcast(reset);
+    updateOverlayText("✅ COMPILATA: "+clean+"\nGià presenti: "+s+"/"+n);};pendingCompilation.add(f);handler.postDelayed(f,Math.max(300,index*240L+300L));}
  private float[] calibratedKeyCenter(char c,float w,float h){String a="QWERTYUIOP",b="ASDFGHJKL",d="ZXCVBNM";int i;if(manualCalibrationCenters!=null&&manualCalibrationCenters.length==52){int p=calibrationLetters.indexOf(c);if(p>=0)return new float[]{manualCalibrationCenters[p*2],manualCalibrationCenters[p*2+1]};}if(calibratedCenters!=null&&calibratedCenters.length>=38){if((i=a.indexOf(c))>=0)return new float[]{calibratedCenters[i*2],calibratedCenters[i*2+1]};if((i=b.indexOf(c))>=0){int p=10+i;return new float[]{calibratedCenters[p*2],calibratedCenters[p*2+1]};}if((i=d.indexOf(c))>=0){int p=19+i;return new float[]{calibratedCenters[p*2],calibratedCenters[p*2+1]};}}return keyCenter(c,w,h);}
  private float[] keyCenter(char c,float w,float h){String a="QWERTYUIOP",b="ASDFGHJKL",d="ZXCVBNM";int i;if((i=a.indexOf(c))>=0)return new float[]{w*(.05f+i*.10f),h*.77f};if((i=b.indexOf(c))>=0)return new float[]{w*(.10f+i*.10f),h*.855f};if((i=d.indexOf(c))>=0)return new float[]{w*(.25f+i*.10f),h*.94f};return null;}
  private void tap(float x,float y){Path p=new Path();p.moveTo(x,y);GestureDescription.StrokeDescription s=new GestureDescription.StrokeDescription(p,0,60);dispatchGesture(new GestureDescription.Builder().addStroke(s).build(),null,null);}
