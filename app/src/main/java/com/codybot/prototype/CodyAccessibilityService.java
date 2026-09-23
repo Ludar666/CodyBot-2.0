@@ -121,7 +121,8 @@ public class CodyAccessibilityService extends AccessibilityService {
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.UPDATE_OVERLAY"));
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.FILL_ANSWER"));
             registerReceiver(overlayReceiver, new IntentFilter("com.codybot.STOP_COMPILATION"));
-            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.TEST_KEYBOARD"));\n            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.CALIBRATE_KEYBOARD"));
+            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.TEST_KEYBOARD"));
+            registerReceiver(overlayReceiver, new IntentFilter("com.codybot.CALIBRATE_KEYBOARD"));
         } catch (Exception e) { e.printStackTrace(); }
 
         if (!Settings.canDrawOverlays(this)) {
