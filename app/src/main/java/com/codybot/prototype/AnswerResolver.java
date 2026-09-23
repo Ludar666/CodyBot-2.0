@@ -12,10 +12,10 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Iterator;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.regex.Pattern;\nimport android.content.SharedPreferences;
 
 public class AnswerResolver {
-    private static JSONObject localDb = null;
+    private static JSONObject localDb = null;\n    private static final String PREFS="codybot_archive";\n    private static final String KEY="answers";
 
     public static synchronized void init(Context context) {
         if (localDb != null) return;
@@ -141,6 +141,36 @@ public class AnswerResolver {
             if (c != null) c.disconnect();
         }
         return null;
+    }
+
+    private static String getLearned(Context context,String clue,int expectedLength){
+        try{
+            SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
+            String json=p.getString(KEY,"{}");
+            JSONObject db=new JSONObject(json);
+            if(!db.has(clue))return null;
+            String ans=db.getString(clue);
+            return validAnswer(ans,expectedLength)?ans:null;
+        }catch(Exception ignored){return null;}
+    }
+
+    private static void saveLearned(Context context,String clue,String answer){
+        try{
+            if(!validAnswer(answer,-1))return;
+            SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
+            JSONObject db=new JSONObject(p.getString(KEY,"{}"));
+            db.put(clue,answer);
+            p.edit().putString(KEY,db.toString()).apply();
+        }catch(Exception ignored){}
+    }
+
+    public static int archiveSize(Context context){
+        try{return new JSONObject(context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getString(KEY,"{}")).length();}
+        catch(Exception ignored){return 0;}
+    }
+
+    public static void clearLearnedArchive(Context context){
+        context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().clear().apply();
     }
 
     private static String onlineSearch(String clue, int expectedLength) {
