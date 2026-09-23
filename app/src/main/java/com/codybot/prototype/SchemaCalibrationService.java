@@ -37,7 +37,7 @@ public class SchemaCalibrationService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int length;
     private final List<List<int[]>> pages = new ArrayList<>();
-    private List<int[]> currentRows = new ArrayList<>();
+    private List<List<int[]>> currentRows = new ArrayList<>();
     private List<int[]> currentRow = new ArrayList<>();
     private boolean acquiring;
 
