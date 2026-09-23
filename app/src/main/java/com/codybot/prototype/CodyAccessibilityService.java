@@ -77,8 +77,7 @@ public class CodyAccessibilityService extends AccessibilityService {
 
             if ("com.codybot.TEST_KEYBOARD".equals(intent.getAction())) {
                 if (ScreenCaptureService.isServiceRunning()) {
-                    fillAnswer("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-                    updateOverlayText("🧪 TEST TASTIERA: A-Z");
+                    runKeyboardTest();
                 } else {
                     updateOverlayText("⚠️ TEST: avvia prima START");
                 }
@@ -158,6 +157,17 @@ public class CodyAccessibilityService extends AccessibilityService {
             }
         });
 
+        Button keyboardTestButton = new Button(this);
+        keyboardTestButton.setText("TEST");
+        keyboardTestButton.setTextSize(11);
+        keyboardTestButton.setOnClickListener(v -> {
+            if (ScreenCaptureService.isServiceRunning()) {
+                runKeyboardTest();
+            } else if (statusText != null) {
+                statusText.setText("⚠️ TEST: premi prima START");
+            }
+        });
+
         stopButton = new Button(this);
         stopButton.setText("STOP");
         stopButton.setTextSize(11);
@@ -172,6 +182,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         });
 
         layout.addView(startButton);
+        layout.addView(keyboardTestButton);
         layout.addView(stopButton);
         overlayView = layout;
 
@@ -190,6 +201,49 @@ public class CodyAccessibilityService extends AccessibilityService {
             e.printStackTrace();
             handler.postDelayed(overlayChecker, 1000);
         }
+    }
+
+    /**
+     * Test diagnostico: usa volutamente le coordinate di fallback, senza OCR
+     * o calibrazione. In questo modo possiamo verificare prima di tutto che
+     * dispatchGesture() stia realmente premendo la tastiera.
+     */
+    private void runKeyboardTest() {
+        stopCompilation();
+        final String clean = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        compiling = true;
+        calibratedCenters = null;
+        updateOverlayText("🧪 TEST TASTIERA\nA-Z in corso...");
+
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        final float w = dm.widthPixels;
+        final float h = dm.heightPixels;
+
+        for (int i = 0; i < clean.length(); i++) {
+            final char letter = clean.charAt(i);
+            final float[] xy = keyCenter(letter, w, h);
+            final long delay = i * 300L;
+            final int n = i + 1;
+
+            Runnable r = () -> {
+                if (!compiling || !ScreenCaptureService.isServiceRunning()) return;
+                if (xy != null) {
+                    tap(xy[0], xy[1]);
+                    updateOverlayText("🧪 TEST TASTIERA\nPremuto: " + letter + " (" + n + "/26)");
+                }
+            };
+            pendingCompilation.add(r);
+            handler.postDelayed(r, delay);
+        }
+
+        Runnable finish = () -> {
+            if (!compiling) return;
+            compiling = false;
+            pendingCompilation.clear();
+            updateOverlayText("🧪 TEST TERMINATO\nControlla quali lettere sono state digitate.");
+        };
+        pendingCompilation.add(finish);
+        handler.postDelayed(finish, clean.length() * 300L + 500L);
     }
 
     private void fillAnswer(String answer) {
