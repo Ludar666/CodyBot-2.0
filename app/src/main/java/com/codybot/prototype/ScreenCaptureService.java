@@ -17,6 +17,7 @@ import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 public class ScreenCaptureService extends Service {
     public static final String ACTION_TOGGLE="com.codybot.prototype.ACTION_TOGGLE";
