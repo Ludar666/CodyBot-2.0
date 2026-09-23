@@ -16,7 +16,7 @@ import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
-import java.nio.ByteBuffer;
+import java.nio.ByteBuffer;\nimport java.text.Normalizer;
 import java.util.ArrayList;
 
 public class ScreenCaptureService extends Service {
@@ -303,6 +303,15 @@ public class ScreenCaptureService extends Service {
         return (int)(0.299f*((color>>16)&255)+0.587f*((color>>8)&255)+0.114f*(color&255));
     }
 
+    private String normalizeOcrText(String text){
+        if(text==null)return "";
+        String s=Normalizer.normalize(text, Normalizer.Form.NFD);
+        s=s.replaceAll("\\p{M}+","");
+        s=s.replace("\u2019","'").replace("\u2018","'");
+        s=s.replace("\u2010","-").replace("\u2011","-").replace("\u2013","-").replace("\u2014","-");
+        return s;
+    }
+
     private String extractClue(Text result){
         StringBuilder out=new StringBuilder();
 
@@ -310,6 +319,7 @@ public class ScreenCaptureService extends Service {
             String value=block.getText();
             if(value==null)continue;
 
+            value=normalizeOcrText(value);
             value=value.replaceAll("\\s+"," ").trim();
             if(value.isEmpty())continue;
 
@@ -346,12 +356,11 @@ public class ScreenCaptureService extends Service {
 
     private String normalizeClue(String s){
         if(s==null)return "";
-        return s.toLowerCase()
-                .replaceAll("[^a-zàèéìòùáéíóú0-9 ]","")
+        s=normalizeOcrText(s).toLowerCase();
+        return s.replaceAll("[^a-z0-9 ]","")
                 .replaceAll("\\s+"," ")
                 .trim();
     }
-
     private void broadcast(String msg,String clue){
         Intent x=new Intent("com.codybot.UPDATE_OVERLAY");
         x.setPackage(getPackageName());
