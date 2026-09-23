@@ -130,6 +130,59 @@ public class ScreenCaptureService extends Service {
         }
     }
 
+    private void startScanning(){
+        if(projection==null || running) return;
+        try{
+            DisplayMetrics dm=getResources().getDisplayMetrics();
+            int w=dm.widthPixels,h=dm.heightPixels;
+
+            reader=ImageReader.newInstance(w,h,PixelFormat.RGBA_8888,2);
+            reader.setOnImageAvailableListener(r->{
+                if(!running)return;
+                Image image=null;
+                try{
+                    image=r.acquireLatestImage();
+                    if(image==null)return;
+
+                    long now=System.currentTimeMillis();
+                    if(now-lastScan<850)return;
+                    lastScan=now;
+
+                    Image.Plane p=image.getPlanes()[0];
+                    ByteBuffer buf=p.getBuffer();
+                    int ps=p.getPixelStride(), rs=p.getRowStride();
+                    int pad=rs-ps*w;
+
+                    Bitmap full=Bitmap.createBitmap(w+pad/ps,h,Bitmap.Config.ARGB_8888);
+                    full.copyPixelsFromBuffer(buf);
+
+                    int top=(int)(h*.38f);
+                    int bottom=(int)(h*.76f);
+                    Bitmap crop=Bitmap.createBitmap(full,0,top,w,bottom-top);
+                    full.recycle();
+                    runOcr(crop);
+                }catch(Exception e){
+                    if(running) broadcast("ERRORE CATTURA: "+e.getClass().getSimpleName(),"");
+                }finally{
+                    if(image!=null)image.close();
+                }
+            },handler);
+
+            display=projection.createVirtualDisplay(
+                    "CodyBot",w,h,dm.densityDpi,
+                    android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    reader.getSurface(),null,handler);
+
+            running=true;
+            lastScan=0;
+            lastClue="";
+            broadcast("🟢 SCANSIONE ATTIVA\\nIn attesa dell'indizio...","");
+        }catch(Exception e){
+            broadcast("ERRORE AVVIO: "+e.getMessage(),"");
+            stopScanning();
+        }
+    }
+
     private void runOcr(Bitmap bmp){
         if(!running){
             bmp.recycle();
@@ -233,16 +286,18 @@ public class ScreenCaptureService extends Service {
         broadcast(running?"🟢 SCANSIONE ATTIVA":"🔴 SCANSIONE FERMA","");
     }
 
-    private void stopCapture(){
+    private void stopScanning(){
         running=false;
         lastClue="";
         lastScan=0;
-
         if(display!=null){display.release();display=null;}
         if(reader!=null){reader.close();reader=null;}
-        if(projection!=null){projection.stop();projection=null;}
-
         broadcast("🔴 SCANSIONE FERMA","");
+    }
+
+    private void stopCapture(){
+        stopScanning();
+        if(projection!=null){projection.stop();projection=null;}
     }
 
     public static boolean isServiceRunning(){return running;}
