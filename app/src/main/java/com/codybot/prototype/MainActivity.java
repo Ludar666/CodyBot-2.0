@@ -182,7 +182,7 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    private void chooseSchemaLength    private void chooseSchemaLength(String title, String action) {
+    private void chooseSchemaLength(String title, String action) {
         final String[] lengths = new String[18];
         for (int i = 0; i < lengths.length; i++) {
             lengths[i] = String.valueOf(i + 3);
