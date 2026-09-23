@@ -34,8 +34,15 @@ public class AnswerResolver {
 
     public static String normalizeText(String text) {
         if (text == null) return "";
+
+        // Normalizzazione pensata per la scrittura italiana e per la tastiera
+        // CodyCross: gli accenti vengono ricondotti alla vocale base.
         String clean = Normalizer.normalize(text, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}+", "")
+                .replace('ø','o').replace('Ø','O')
+                .replace('ð','d').replace('Ð','D')
+                .replace('þ','t').replace('Þ','T')
+                .replace('ß','s')
                 .toLowerCase()
                 .replaceAll("(?<=[a-z])0(?=[a-z])", "o")
                 .replaceAll("[^a-z0-9\\s]", " ")
