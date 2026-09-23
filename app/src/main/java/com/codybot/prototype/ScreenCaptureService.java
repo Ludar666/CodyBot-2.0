@@ -144,6 +144,26 @@ public class ScreenCaptureService extends Service {
                     image=r.acquireLatestImage();
                     if(image==null)return;
 
+                    // Schema capture has priority over the normal OCR throttle.
+                    // ImageReader frames are acquired and released on every pass.
+                    // This follows the Android recommendation to use acquireLatestImage()
+                    // and close the acquired Image promptly.
+                    if(schemaCaptureRequested && schemaTarget!=null){
+                        schemaCaptureRequested=false;
+                        CodyAccessibilityService target=schemaTarget;
+                        schemaTarget=null;
+                        Image.Plane sp=image.getPlanes()[0];
+                        ByteBuffer sbuf=sp.getBuffer();
+                        int sps=sp.getPixelStride(), srs=sp.getRowStride();
+                        int spad=srs-sps*w;
+                        Bitmap schemaFull=Bitmap.createBitmap(w+spad/sps,h,Bitmap.Config.ARGB_8888);
+                        schemaFull.copyPixelsFromBuffer(sbuf);
+                        Bitmap schemaCopy=schemaFull.copy(Bitmap.Config.ARGB_8888,false);
+                        schemaFull.recycle();
+                        if(target!=null) target.handleSchemaBitmap(schemaCopy);
+                        return;
+                    }
+
                     long now=System.currentTimeMillis();
                     if(now-lastScan<850)return;
                     lastScan=now;
