@@ -1,60 +1,80 @@
 package com.codybot.prototype;
 
-import android.app.Service;
-import android.content.Intent;
+import android.app.*;
+import android.content.*;
 import android.graphics.Bitmap;
-import android.os.IBinder;
-import android.util.Log;
-import android.widget.Toast;
+import android.graphics.PixelFormat;
+import android.media.Image;
+import android.media.ImageReader;
+import android.media.projection.MediaProjection;
+import android.media.projection.MediaProjectionManager;
+import android.os.*;
+import android.util.DisplayMetrics;
+import androidx.annotation.Nullable;
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.latin.TextRecognizer;
+import java.nio.ByteBuffer;
 
 public class ScreenCaptureService extends Service {
-    private static final String TAG = "CodyBot";
-    public static final String ACTION_TOGGLE = "com.codybot.prototype.ACTION_TOGGLE";
-    
-    private static boolean isRunning = false;
+    public static final String ACTION_TOGGLE="com.codybot.prototype.ACTION_TOGGLE";
+    public static final String ACTION_START_CAPTURE="com.codybot.prototype.ACTION_START_CAPTURE";
+    public static final String ACTION_STOP_CAPTURE="com.codybot.prototype.ACTION_STOP_CAPTURE";
+    public static final String EXTRA_RESULT_CODE="result_code";
+    public static final String EXTRA_DATA="projection_data";
+    private static boolean running;
+    private MediaProjection projection;
+    private ImageReader reader;
+    private android.hardware.display.VirtualDisplay display;
+    private final Handler handler=new Handler(Looper.getMainLooper());
+    private TextRecognizer recognizer;
+    private String lastClue="";
+    private long lastScan=0;
 
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_TOGGLE.equals(intent.getAction())) {
-            toggleService();
-        }
+    @Override public void onCreate(){ super.onCreate(); recognizer=TextRecognition.getClient(); startForeground(11, notification()); }
+    @Override public int onStartCommand(Intent i,int flags,int id){
+        if(i==null) return START_STICKY;
+        String a=i.getAction();
+        if(ACTION_TOGGLE.equals(a)){ if(running) stopCapture(); else requestProjection(); }
+        else if(ACTION_START_CAPTURE.equals(a)) startCapture(i);
+        else if(ACTION_STOP_CAPTURE.equals(a)) stopCapture();
         return START_STICKY;
     }
-
-    public static boolean isServiceRunning() {
-        return isRunning;
+    private Notification notification(){
+        String ch="codybot_capture";
+        if(Build.VERSION.SDK_INT>=26){ NotificationChannel c=new NotificationChannel(ch,"CodyBot cattura",NotificationManager.IMPORTANCE_LOW); ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(c); }
+        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,ch):new Notification.Builder(this);
+        return b.setContentTitle("CodyBot").setContentText("Cattura schermo attiva").setSmallIcon(android.R.drawable.ic_menu_view).build();
     }
-
-    private void toggleService() {
-        isRunning = !isRunning;
-        String statusMessage = isRunning ? "CodyBot AVVIATO" : "CodyBot FERMATO";
-        Toast.makeText(getApplicationContext(), statusMessage, Toast.LENGTH_SHORT).show();
-        Log.d(TAG, statusMessage);
+    private void requestProjection(){
+        Intent x=new Intent(this,MediaProjectionActivity.class); x.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(x);
+        broadcast("Premi Consenti per avviare la cattura", "");
     }
-
-    private Bitmap cropClue(Bitmap source) {
-        int w = source.getWidth(), h = source.getHeight();
-        int left = Math.max(0, Math.round(w * 0.05f));
-        int top = Math.max(0, Math.round(h * 0.625f));
-        int right = Math.min(w, Math.round(w * 0.95f));
-        int bottom = Math.min(h, Math.round(h * 0.665f));
-        if (right <= left || bottom <= top) return source;
-        return Bitmap.createBitmap(source, left, top, right - left, bottom - top);
+    private void startCapture(Intent i){
+        try{
+            stopCapture();
+            int rc=i.getIntExtra(EXTRA_RESULT_CODE,0);
+            Intent data=i.getParcelableExtra(EXTRA_DATA);
+            MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
+            projection=m.getMediaProjection(rc,data);
+            DisplayMetrics dm=getResources().getDisplayMetrics(); int w=dm.widthPixels,h=dm.heightPixels;
+            reader=ImageReader.newInstance(w,h,PixelFormat.RGBA_8888,2);
+            reader.setOnImageAvailableListener(r->{ if(!running)return; Image image=null; try{ image=r.acquireLatestImage(); if(image==null)return; long now=System.currentTimeMillis(); if(now-lastScan<850)return; lastScan=now;
+                Image.Plane p=image.getPlanes()[0]; ByteBuffer buf=p.getBuffer(); int ps=p.getPixelStride(), rs=p.getRowStride(); int pad=rs-ps*w;
+                Bitmap full=Bitmap.createBitmap(w+pad/ps,h,Bitmap.Config.ARGB_8888); full.copyPixelsFromBuffer(buf);
+                int top=(int)(h*.54f), bottom=(int)(h*.75f); Bitmap crop=Bitmap.createBitmap(full,0,top,w,bottom-top); full.recycle(); runOcr(crop);
+            }catch(Exception e){broadcast("Errore cattura: "+e.getClass().getSimpleName(),"");}finally{if(image!=null)image.close();}},handler);
+            display=projection.createVirtualDisplay("CodyBot",w,h,dm.densityDpi,android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,reader.getSurface(),null,handler);
+            running=true; broadcast("CATTURA ATTIVA","Cattura schermo...");
+        }catch(Exception e){broadcast("Errore cattura: "+e.getMessage(),"");stopCapture();}
     }
-
-    public void processCapturedText(String rawText) {
-        if (!isRunning || rawText == null || rawText.trim().isEmpty()) return;
-
-        String cleanClue = rawText.replaceAll("(?i)^[0-9+ \\s]+", "").trim();
-        if (cleanClue.isEmpty()) return;
-
-        Log.d(TAG, "Indizio pulito: " + cleanClue);
-        String answer = AnswerResolver.resolve(this, cleanClue, -1);
-        Log.d(TAG, "Risposta trovata: " + answer);
+    private void runOcr(Bitmap bmp){
+        InputImage input=InputImage.fromBitmap(bmp,0);
+        recognizer.process(input).addOnSuccessListener(result->{ String text=result.getText(); bmp.recycle(); if(text==null||text.trim().isEmpty())return; String clue=text.replaceAll("\\s+"," ").trim(); if(clue.equalsIgnoreCase(lastClue))return; lastClue=clue; broadcast("INDIZIO: "+clue,clue); String ans=AnswerResolver.resolve(this,clue,-1); if(ans!=null&&!ans.startsWith("Non in archivio")&&!ans.startsWith("Nessun")){ broadcast("RISPOSTA: "+ans,ans); Intent x=new Intent("com.codybot.FILL_ANSWER"); x.setPackage(getPackageName()); x.putExtra("answer",ans); sendBroadcast(x);} else broadcast("RISPOSTA: non trovata",""); }).addOnFailureListener(e->{bmp.recycle(); broadcast("OCR: errore","");});
     }
+    private void broadcast(String msg,String clue){ Intent x=new Intent("com.codybot.UPDATE_OVERLAY"); x.setPackage(getPackageName()); x.putExtra("message",msg); x.putExtra("clue",clue); sendBroadcast(x); }
+    private void stopCapture(){ running=false; lastClue=""; if(display!=null){display.release();display=null;} if(reader!=null){reader.close();reader=null;} if(projection!=null){projection.stop();projection=null;} }
+    public static boolean isServiceRunning(){return running;}
+    @Nullable @Override public IBinder onBind(Intent i){return null;}
+    @Override public void onDestroy(){stopCapture();if(recognizer!=null)recognizer.close();super.onDestroy();}
 }
