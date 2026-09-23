@@ -128,10 +128,10 @@ public class MainActivity extends Activity {
         final String[] lengths = new String[18];
         for (int i = 0; i < lengths.length; i++) lengths[i] = String.valueOf(i + 3);
         new AlertDialog.Builder(this)
-                .setTitle("CALIBRAZIONE SCHEMA - lettere per parola")
-                .setMessage("Scegli quante caselle ha ogni parola. Il numero di parole verrà acquisito automaticamente durante la calibrazione.")
-                .setItems(lengths, (dialog, which) -> {
+                .setTitle("CALIBRAZIONE SCHEMA")
+                .setSingleChoiceItems(lengths, -1, (dialog, which) -> {
                     int length = which + 3;
+                    dialog.dismiss();
                     Intent intent = new Intent(this, SchemaCalibrationService.class);
                     intent.setAction(SchemaCalibrationService.ACTION_START);
                     intent.putExtra(SchemaCalibrationService.EXTRA_LENGTH, length);
