@@ -197,10 +197,17 @@ public class ScreenCaptureService extends Service {
             value=value.replaceAll("(?i)\\bCodyCross\\b"," ");
             value=value.replaceAll("(?i)\\bORIZZONTALE\\b"," ");
             value=value.replaceAll("(?i)\\bVERTICALE\\b"," ");
-            value=value.replaceAll("(?i)\\bINDIZIO\\b\\s*:?"," ");
+            value=value.replaceAll("(?i)\\bINDIZIO\\b\\s*: ?"," ");
+
+            // Il banner di CodyCross contiene spesso contatori numerici (es. 999+ 209 956)
+            // che ML Kit può leggere come parte dell'indizio.
+            value=value.replaceAll("(?<![A-Za-zÀ-ÖØ-öø-ÿ])(?:\\d+[+%]?\\s*){2,}", " ");
+            value=value.replaceAll("(?<![A-Za-zÀ-ÖØ-öø-ÿ])\\d{2,4}(?=\\s|$)", " ");
+
+            // Correzione OCR comune: 0 letto al posto della O dentro una parola.
+            value=value.replaceAll("(?i)(?<=[A-Za-zÀ-ÖØ-öø-ÿ])0(?=[A-Za-zÀ-ÖØ-öø-ÿ])","o");
             value=value.replaceAll("\\s+"," ").trim();
 
-            // Ignora blocchi composti solo da simboli/lettere isolate.
             String letters=value.replaceAll("[^A-Za-zÀ-ÖØ-öø-ÿ0-9]","");
             if(letters.length()<2)continue;
 
@@ -213,7 +220,6 @@ public class ScreenCaptureService extends Service {
                 .replaceAll("\\s+"," ")
                 .trim();
 
-        // Limitiamo il rumore OCR palesemente anomalo.
         if(clue.length()>140)clue=clue.substring(0,140).trim();
         return clue;
     }
