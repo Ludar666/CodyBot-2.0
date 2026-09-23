@@ -123,7 +123,7 @@ public class AnswerResolver {
             if (c.getResponseCode() != 200) return null;
             BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder(); String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\\n');
+            while ((line = br.readLine()) != null) html.append(line).append('\n');
             br.close();
             Matcher links = Pattern.compile("uddg=([^&\\\"]+)", Pattern.CASE_INSENSITIVE).matcher(html.toString());
             int tried = 0;
@@ -154,7 +154,7 @@ public class AnswerResolver {
             if (c.getResponseCode() != 200) return null;
             BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder(); String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\\n');
+            while ((line = br.readLine()) != null) html.append(line).append('\n');
             br.close();
             String text = html.toString().replaceAll("(?is)<script.*?</script>", " ")
                     .replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ")
