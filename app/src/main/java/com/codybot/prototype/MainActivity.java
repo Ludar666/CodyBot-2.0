@@ -111,12 +111,12 @@ public class MainActivity extends Activity {
                     } else if (which == 5) {
                         chooseSchemaLength("TEST SCHEMA", "TEST_SCHEMA");
                     } else if (which == 6) {
-                        importSchemaCalibration();
-                    } else if (which == 7) {
                         Intent intent = new Intent("com.codybot.EXPORT_SCHEMA");
                         intent.setPackage(getPackageName());
                         sendBroadcast(intent);
                         status.setText("ESPORTAZIONE SCHEMA AVVIATA");
+                    } else if (which == 7) {
+                        importSchemaCalibration();
                     }
                 })
                 .show();
