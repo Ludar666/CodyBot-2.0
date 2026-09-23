@@ -75,15 +75,10 @@ public class AnswerResolver {
 
         if (localDb != null) {
             try {
-                // Prima prova la chiave esatta così com'è e poi, soprattutto,
-                // confronta le chiavi dell'archivio dopo la stessa normalizzazione
-                // usata sull'OCR. In questo modo "tiramisù" e "tiramisu" sono
-                // la stessa domanda per la ricerca interna.
                 if (localDb.has(cleanClue)) {
                     String ans = localDb.getString(cleanClue).toUpperCase().trim();
                     if (validAnswer(ans, expectedLength)) return ans;
                 }
-
                 Iterator<String> keys = localDb.keys();
                 while (keys.hasNext()) {
                     String key = keys.next();
@@ -93,8 +88,6 @@ public class AnswerResolver {
                         if (validAnswer(ans, expectedLength)) return ans;
                     }
                 }
-
-                // Fallback per OCR che abbia perso una parte dell'indizio.
                 keys = localDb.keys();
                 while (keys.hasNext()) {
                     String key = keys.next();
@@ -172,7 +165,7 @@ public class AnswerResolver {
             if (c.getResponseCode() != 200) return null;
             BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder(); String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\\n');
+            while ((line = br.readLine()) != null) html.append(line).append('\n');
             br.close();
             Matcher links = Pattern.compile("uddg=([^&\\\"]+)", Pattern.CASE_INSENSITIVE).matcher(html.toString());
             int tried = 0;
@@ -203,9 +196,9 @@ public class AnswerResolver {
             if (c.getResponseCode() != 200) return null;
             BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder html = new StringBuilder(); String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\\n');
+            while ((line = br.readLine()) != null) html.append(line).append('\n');
             br.close();
-            String text = html.toString().replaceAll("(?is)<script.*?</script>", " ").replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ").replaceAll("&nbsp;", " ").replaceAll("&quot;", "\\\"").replaceAll("&#39;", "'").replaceAll("&amp;", "&").replaceAll("\\s+", " ").trim();
+            String text = html.toString().replaceAll("(?is)<script.*?</script>", " ").replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ").replaceAll("&nbsp;", " ").replaceAll("&quot;", "\"").replaceAll("&#39;", "'").replaceAll("&amp;", "&").replaceAll("\\s+", " ").trim();
             String normalizedPage = normalizeText(text);
             String[] words = clue.split(" "); int relevant = 0, found = 0;
             for (String word : words) { if (word.length() < 3) continue; relevant++; if (normalizedPage.contains(normalizeText(word))) found++; }
@@ -229,8 +222,8 @@ public class AnswerResolver {
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) CodyBot/3.8"); c.setConnectTimeout(8000); c.setReadTimeout(8000); c.setInstanceFollowRedirects(true);
             if (c.getResponseCode() != 200) return null;
             BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8)); StringBuilder html = new StringBuilder(); String line;
-            while ((line = br.readLine()) != null) html.append(line).append('\\n'); br.close();
-            String text = html.toString().replaceAll("(?is)<script.*?</script>", " ").replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ").replaceAll("&nbsp;", " ").replaceAll("&quot;", "\\\"").replaceAll("&#39;", "'").replaceAll("&amp;", "&").replaceAll("\\s+", " ").trim();
+            while ((line = br.readLine()) != null) html.append(line).append('\n'); br.close();
+            String text = html.toString().replaceAll("(?is)<script.*?</script>", " ").replaceAll("(?is)<style.*?</style>", " ").replaceAll("<[^>]+>", " ").replaceAll("&nbsp;", " ").replaceAll("&quot;", "\"").replaceAll("&#39;", "'").replaceAll("&amp;", "&").replaceAll("\\s+", " ").trim();
             String normalizedPage = normalizeText(text); String[] words = clue.split(" "); int relevant = 0, found = 0;
             for (String word : words) { if (word.length() < 3) continue; relevant++; if (normalizedPage.contains(normalizeText(word))) found++; }
             if (relevant > 0 && found < Math.max(1, (int)Math.ceil(relevant * 0.50))) return null;
