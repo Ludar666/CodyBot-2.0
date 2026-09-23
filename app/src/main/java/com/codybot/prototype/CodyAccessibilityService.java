@@ -150,7 +150,7 @@ public class CodyAccessibilityService extends AccessibilityService {
         startButton.setTextSize(11);
         startButton.setOnClickListener(v -> {
             Intent intent = new Intent(this, ScreenCaptureService.class);
-            intent.setAction(ScreenCaptureService.ACTION_TOGGLE);
+            intent.setAction(ScreenCaptureService.ACTION_START_SCAN);
             try { startService(intent); }
             catch (Exception e) {
                 if (statusText != null) statusText.setText("Errore: " + e.getClass().getSimpleName());
