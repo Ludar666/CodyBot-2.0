@@ -4,10 +4,11 @@
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <application
         android:allowBackup="true"
-        android:label="CodyBot 3.1"
+        android:label="CodyBot 3.7"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
@@ -20,8 +21,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.codybot.prototype.MediaProjectionActivity"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:excludeFromRecents="true"
+            android:exported="false" />
+
         <service
-            android:name=".CodyAccessibilityService"
+            android:name="com.codybot.app.CodyAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">
             <intent-filter>
