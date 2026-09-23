@@ -29,5 +29,7 @@
         </service>
         <service android:name="com.codybot.prototype.ScreenCaptureService"
             android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service android:name="com.codybot.prototype.SchemaCalibrationService"
+            android:exported="false" />
     </application>
 </manifest>
