@@ -43,6 +43,7 @@ public class CodyAccessibilityService extends AccessibilityService {
  private static final float DEFAULT_ADVANCE_X=1016f;
  private static final float DEFAULT_ADVANCE_Y=1559f;
  private float advanceX=DEFAULT_ADVANCE_X, advanceY=DEFAULT_ADVANCE_Y;
+ private boolean advanceDetectionArmed=false;
  private View coordinateView;
  private final Runnable overlayChecker=new Runnable(){public void run(){if(overlayHidden)return;if(overlayView==null){if(Settings.canDrawOverlays(CodyAccessibilityService.this))showOverlay();else handler.postDelayed(this,1000);}}};
  private final BroadcastReceiver overlayReceiver=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(i==null)return;if(i.hasExtra("message")&&statusText!=null)statusText.setText(i.getStringExtra("message"));String a=i.getAction();if("com.codybot.FILL_ANSWER".equals(a)){String s=i.getStringExtra("answer");if(s!=null&&!s.trim().isEmpty()&&ScreenCaptureService.isServiceRunning())fillAnswer(s);}else if("com.codybot.STOP_COMPILATION".equals(a))stopCompilation();else if("com.codybot.ARM_TEST_KEYBOARD".equals(a)){armKeyboardTest();}
@@ -52,6 +53,10 @@ else if("com.codybot.TEST_KEYBOARD".equals(a)){runKeyboardTest();}else if("com.c
  if(keyboardTestArmed){
   keyboardTestArmed=false;
   handler.postDelayed(this::runKeyboardTest,700);
+ }
+ if(advanceDetectionArmed){
+  advanceDetectionArmed=false;
+  handler.postDelayed(this::startAdvanceCoordinateDetection,500);
  }
 }}if(!overlayHidden&&overlayView==null&&Settings.canDrawOverlays(this))handler.post(overlayChecker);}
  public static String getLastTargetPackage(){return lastTargetPackage;}
@@ -86,7 +91,56 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
  private void loadAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);advanceX=p.getFloat("x",DEFAULT_ADVANCE_X);advanceY=p.getFloat("y",DEFAULT_ADVANCE_Y);}
  private void saveAdvancePoint(float x,float y){advanceX=x;advanceY=y;getSharedPreferences("codybot_advance",MODE_PRIVATE).edit().putFloat("x",x).putFloat("y",y).apply();}
  private void testAdvancePoint(){loadAdvancePoint();updateOverlayText("🧪 TEST PUNTO\nPremo "+Math.round(advanceX)+", "+Math.round(advanceY)+"...");handler.postDelayed(()->tap(advanceX,advanceY),250);}
- private void startAdvanceCoordinateDetection(){stopCompilation();if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}if(coordinateView!=null)removeCoordinateView();DisplayMetrics dm=getResources().getDisplayMetrics();FrameLayout f=new FrameLayout(this);f.setBackgroundColor(Color.TRANSPARENT);f.setClickable(true);TextView info=new TextView(this);info.setText("📍 RILEVA COORDINATE\n\nTocca il centro del pulsante «PASSA ALLA RIGA SUCCESSIVA»\n\nTocca ANNULLA per uscire");info.setTextColor(Color.WHITE);info.setTextSize(17);info.setGravity(Gravity.CENTER);info.setBackgroundColor(Color.parseColor("#DD000000"));FrameLayout.LayoutParams ip=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);ip.topMargin=50;f.addView(info,ip);Button cancel=new Button(this);cancel.setText("ANNULLA");cancel.setOnClickListener(v->removeCoordinateView());FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);cp.bottomMargin=80;f.addView(cancel,cp);f.setOnTouchListener((v,e)->{if(e==null||e.getAction()!=android.view.MotionEvent.ACTION_UP)return true;if(e.getY()<220)return true;float x=e.getX(),y=e.getY();saveAdvancePoint(x,y);removeCoordinateView();updateOverlayText("✅ COORDINATA SALVATA\nX = "+Math.round(x)+"\nY = "+Math.round(y));return true;});coordinateView=f;WindowManager.LayoutParams lp=new WindowManager.LayoutParams(dm.widthPixels,dm.heightPixels,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);lp.gravity=Gravity.TOP|Gravity.START;try{windowManager.addView(coordinateView,lp);}catch(Exception e){coordinateView=null;updateOverlayText("❌ Errore rilevazione: "+e.getClass().getSimpleName());}}
+ private void startAdvanceCoordinateDetection(){
+  stopCompilation();
+  if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}
+  if(coordinateView!=null)removeCoordinateView();
+
+  LinearLayout p=new LinearLayout(this);
+  p.setOrientation(LinearLayout.VERTICAL);
+  p.setGravity(Gravity.CENTER_HORIZONTAL);
+  p.setPadding(28,24,28,24);
+  p.setBackgroundColor(Color.parseColor("#EE111111"));
+
+  TextView t=new TextView(this);
+  t.setText("📍 RILEVA COORDINATE AVANZAMENTO");
+  t.setTextColor(Color.WHITE);
+  t.setTextSize(20);
+  t.setGravity(Gravity.CENTER);
+  p.addView(t,new LinearLayout.LayoutParams(-1,-2));
+
+  TextView m=new TextView(this);
+  m.setText("1. Premi AVVIA RILEVAMENTO.\\n\\n2. CodyBot si metterà in attesa e ti lascerà passare a CodyCross.\\n\\n3. Porta CodyCross sulla schermata dello schema.\\n\\n4. Quando CodyCross è in primo piano, comparirà la schermata per toccare il centro di «PASSA ALLA RIGA SUCCESSIVA».");
+  m.setTextColor(Color.WHITE);
+  m.setTextSize(16);
+  m.setPadding(0,20,0,20);
+  p.addView(m,new LinearLayout.LayoutParams(-1,-2));
+
+  LinearLayout r=new LinearLayout(this);
+  r.setGravity(Gravity.CENTER);
+  Button c=new Button(this);
+  c.setText("ANNULLA");
+  c.setOnClickListener(v->{advanceDetectionArmed=false;removeCoordinateView();});
+  Button s=new Button(this);
+  s.setText("AVVIA RILEVAMENTO");
+  s.setOnClickListener(v->{
+    removeCoordinateView();
+    advanceDetectionArmed=true;
+    overlayHidden=true;
+    if(overlayView!=null)removeOverlay();
+    updateOverlayText("📍 RILEVAMENTO PRONTO\\n\\nOra passa a CodyCross.\\nLa schermata di rilevamento apparirà automaticamente.");
+  });
+  r.addView(c);
+  r.addView(s);
+  p.addView(r);
+
+  coordinateView=p;
+  DisplayMetrics dm=getResources().getDisplayMetrics();
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(dm.widthPixels*.92f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;
+  q.y=120;
+  try{windowManager.addView(coordinateView,q);}catch(Exception e){coordinateView=null;updateOverlayText("❌ Errore rilevazione: "+e.getClass().getSimpleName());}
+ }
  private void removeCoordinateView(){if(coordinateView!=null&&windowManager!=null)try{windowManager.removeView(coordinateView);}catch(Exception ignored){}coordinateView=null;}
  private void saveManualCalibration(float[] c,int w,int h){StringBuilder s=new StringBuilder();for(int i=0;i<c.length;i++){if(i>0)s.append(',');s.append(c[i]);}getSharedPreferences("codybot_keyboard",MODE_PRIVATE).edit().putString("centers",s.toString()).putInt("width",w).putInt("height",h).apply();}
  private void loadManualCalibration(){String raw=getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getString("centers",null);if(raw==null)return;String[] p=raw.split(",");if(p.length!=52)return;try{float[] c=new float[52];for(int i=0;i<52;i++)c[i]=Float.parseFloat(p[i]);manualCalibrationCenters=c;calibratedCenters=c.clone();}catch(Exception ignored){manualCalibrationCenters=null;}}
