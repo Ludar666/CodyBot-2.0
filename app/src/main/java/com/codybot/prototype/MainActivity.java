@@ -15,6 +15,8 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.ScrollView;
+import android.graphics.drawable.GradientDrawable;
 import android.text.InputType;
 import java.util.Map;
 
@@ -22,23 +24,188 @@ public class MainActivity extends Activity {
     private TextView status;
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        LinearLayout layout=new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL); layout.setPadding(50,50,50,50);
-        TextView title=new TextView(this); title.setText("CodyBot 3.1"); title.setTextSize(26); layout.addView(title);
-        status=new TextView(this); status.setTextSize(16); status.setPadding(0,30,0,30); layout.addView(status);
-        Button overlayButton=new Button(this); overlayButton.setText("1. ATTIVA SOVRAPPOSIZIONE"); overlayButton.setOnClickListener(v->openOverlaySettings()); layout.addView(overlayButton);
-        Button accessibilityButton=new Button(this); accessibilityButton.setText("2. ATTIVA ACCESSIBILITÀ"); accessibilityButton.setOnClickListener(v->{try{startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));}catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}}); layout.addView(accessibilityButton);
-        Button advancedButton=new Button(this); advancedButton.setText("3. STRUMENTI AVANZATI"); advancedButton.setOnClickListener(v->showAdvancedTools()); layout.addView(advancedButton);
-        Button closeButton=new Button(this); closeButton.setText("CHIUDI CODYBOT"); closeButton.setOnClickListener(v->{try{sendBroadcast(new Intent("com.codybot.HIDE_OVERLAY")); Intent s=new Intent(this,ScreenCaptureService.class);s.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);startService(s);}catch(Exception ignored){} finishAffinity();}); layout.addView(closeButton);
-        setContentView(layout); refreshStatus();
+
+        LinearLayout root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(28,28,28,24);
+        root.setBackgroundColor(android.graphics.Color.rgb(18,22,28));
+
+        TextView title=new TextView(this);
+        title.setText("CodyBot");
+        title.setTextColor(android.graphics.Color.WHITE);
+        title.setTextSize(28);
+        title.setTypeface(null,android.graphics.Typeface.BOLD);
+        title.setPadding(4,4,4,2);
+        root.addView(title);
+
+        TextView subtitle=new TextView(this);
+        subtitle.setText("Pannello di controllo");
+        subtitle.setTextColor(android.graphics.Color.rgb(150,165,178));
+        subtitle.setTextSize(14);
+        subtitle.setPadding(4,0,4,22);
+        root.addView(subtitle);
+
+        ScrollView scroll=new ScrollView(this);
+        LinearLayout menu=new LinearLayout(this);
+        menu.setOrientation(LinearLayout.VERTICAL);
+
+        TextView section=new TextView(this);
+        section.setText("FUNZIONI PRINCIPALI");
+        section.setTextColor(android.graphics.Color.rgb(0,188,212));
+        section.setTextSize(12);
+        section.setTypeface(null,android.graphics.Typeface.BOLD);
+        section.setPadding(4,6,4,10);
+        menu.addView(section);
+
+        menu.addView(mainMenuButton("⌨  CALIBRAZIONE TASTIERA","Calibra, testa, importa o esporta la tastiera",v->showKeyboardMenu()));
+        menu.addView(mainMenuButton("▦  CALIBRAZIONE SCHEMI","Acquisisci, testa, importa o esporta gli schemi",v->showSchemaMenu()));
+        menu.addView(mainMenuButton("⌖  AVANZAMENTO RIGA","Rileva, modifica e testa la coordinata di avanzamento",v->showAdvanceMenu()));
+
+        TextView setup=new TextView(this);
+        setup.setText("CONFIGURAZIONE");
+        setup.setTextColor(android.graphics.Color.rgb(0,188,212));
+        setup.setTextSize(12);
+        setup.setTypeface(null,android.graphics.Typeface.BOLD);
+        setup.setPadding(4,22,4,10);
+        menu.addView(setup);
+        menu.addView(mainMenuButton("⚙  IMPOSTAZIONI","Sovrapposizione, accessibilità e chiusura",v->showSettingsMenu()));
+
+        TextView statusTitle=new TextView(this);
+        statusTitle.setText("STATO");
+        statusTitle.setTextColor(android.graphics.Color.rgb(0,188,212));
+        statusTitle.setTextSize(12);
+        statusTitle.setTypeface(null,android.graphics.Typeface.BOLD);
+        statusTitle.setPadding(4,22,4,8);
+        menu.addView(statusTitle);
+
+        status=new TextView(this);
+        status.setTextColor(android.graphics.Color.rgb(205,215,222));
+        status.setTextSize(14);
+        status.setPadding(16,14,16,14);
+        GradientDrawable statusBg=new GradientDrawable();
+        statusBg.setColor(android.graphics.Color.rgb(28,34,42));
+        statusBg.setCornerRadius(18);
+        status.setBackground(statusBg);
+        menu.addView(status,new LinearLayout.LayoutParams(-1,-2));
+
+        scroll.addView(menu);
+        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+
+        setContentView(root);
+        refreshStatus();
     }
-    private void showAdvancedTools(){
-        final String[] options={"🔧 CALIBRA TASTIERA","🧪 TEST TASTIERA","📤 ESPORTA CALIBRAZIONE","📥 IMPORTA CALIBRAZIONE","📐 CALIBRA SCHEMA","🧪 TEST SCHEMA","📤 ESPORTA SCHEMA","📥 IMPORTA SCHEMI","📍 RILEVA COORDINATE AVANZAMENTO","🧪 TEST PUNTO AVANZAMENTO","✏️ MODIFICA COORDINATE AVANZAMENTO"};
-        new AlertDialog.Builder(this).setTitle("Strumenti avanzati").setItems(options,(dialog,which)->{
-            if(which==0){Intent i=new Intent("com.codybot.CALIBRATE_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);status.setText("CALIBRAZIONE AVVIATA\n\nTocca A-Z sulla tastiera CodyCross.");}
-            else if(which==1){Intent i=new Intent("com.codybot.ARM_TEST_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);status.setText("🧪 TEST TASTIERA PRONTO\n\nPassa ora a CodyCross.\nIl test A-Z partirà automaticamente quando CodyCross diventa l'app in primo piano.");}
-            else if(which==2)exportCalibration(); else if(which==3)importKeyboardCalibration(); else if(which==4)chooseMultiRowSchemaLength(); else if(which==5)chooseSchemaLength("TEST SCHEMA","TEST_SCHEMA"); else if(which==6)exportSchemaCalibration(); else if(which==7)importSchemaCalibration(); else if(which==8){Intent i=new Intent("com.codybot.DETECT_ADVANCE_COORDINATES");i.setPackage(getPackageName());sendBroadcast(i);status.setText("📍 RILEVA COORDINATE AVVIATA");} else if(which==9){Intent i=new Intent("com.codybot.TEST_ADVANCE_POINT");i.setPackage(getPackageName());sendBroadcast(i);status.setText("🧪 TEST PUNTO AVANZAMENTO INVIATO");} else if(which==10)editAdvancePoint();
+
+    private Button mainMenuButton(String title,String desc,android.view.View.OnClickListener listener){
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(18,15,18,15);
+        GradientDrawable bg=new GradientDrawable();
+        bg.setColor(android.graphics.Color.rgb(30,38,47));
+        bg.setCornerRadius(22);
+        box.setBackground(bg);
+        TextView t=new TextView(this);
+        t.setText(title);
+        t.setTextColor(android.graphics.Color.WHITE);
+        t.setTextSize(17);
+        t.setTypeface(null,android.graphics.Typeface.BOLD);
+        TextView d=new TextView(this);
+        d.setText(desc);
+        d.setTextColor(android.graphics.Color.rgb(155,170,182));
+        d.setTextSize(12);
+        d.setPadding(0,5,0,0);
+        box.addView(t);
+        box.addView(d);
+        box.setOnClickListener(listener);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+        lp.setMargins(0,0,0,12);
+        box.setLayoutParams(lp);
+        Button hidden=new Button(this);
+        // Restituiamo un Button per mantenere il comportamento di click/accessibilità
+        hidden.setVisibility(android.view.View.GONE);
+        return wrapAsButton(box,listener);
+    }
+
+    private Button wrapAsButton(LinearLayout box,android.view.View.OnClickListener listener){
+        Button b=new Button(this);
+        b.setText("");
+        b.setBackground(box.getBackground());
+        b.setOnClickListener(listener);
+        b.setAllCaps(false);
+        b.setMinHeight(78);
+        b.setPadding(18,0,18,0);
+        b.setContentDescription(box.getChildAt(0) instanceof TextView ? ((TextView)box.getChildAt(0)).getText().toString() : "CodyBot");
+        // Il testo descrittivo viene mostrato in una seconda riga tramite spannable.
+        if(box.getChildCount()>1){
+            String a=((TextView)box.getChildAt(0)).getText().toString();
+            String c=((TextView)box.getChildAt(1)).getText().toString();
+            b.setText(a+"\n"+c);
+            b.setTextColor(android.graphics.Color.WHITE);
+            b.setTextSize(15);
+            b.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.LEFT);
+        }
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,82);
+        lp.setMargins(0,0,0,12);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private void showKeyboardMenu(){
+        final String[] options={"🔧 CALIBRA","🧪 TEST","📥 IMPORTA","📤 ESPORTA"};
+        new AlertDialog.Builder(this).setTitle("CALIBRAZIONE TASTIERA").setItems(options,(d,w)->{
+            if(w==0){
+                Intent i=new Intent("com.codybot.CALIBRATE_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);
+                status.setText("CALIBRAZIONE TASTIERA AVVIATA\\n\\nTocca A-Z sulla tastiera CodyCross.");
+            } else if(w==1){
+                Intent i=new Intent("com.codybot.ARM_TEST_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);
+                status.setText("🧪 TEST TASTIERA PRONTO\\n\\nPassa ora a CodyCross.\\nIl test A-Z partirà automaticamente quando CodyCross diventa l'app in primo piano.");
+            } else if(w==2) importKeyboardCalibration();
+            else exportCalibration();
         }).show();
     }
+
+    private void showSchemaMenu(){
+        final String[] options={"📐 CALIBRA","🧪 TEST","📥 IMPORTA","📤 ESPORTA"};
+        new AlertDialog.Builder(this).setTitle("CALIBRAZIONE SCHEMI").setItems(options,(d,w)->{
+            if(w==0) chooseMultiRowSchemaLength();
+            else if(w==1) chooseSchemaLength("TEST SCHEMA","TEST_SCHEMA");
+            else if(w==2) importSchemaCalibration();
+            else exportSchemaCalibration();
+        }).show();
+    }
+
+    private void showAdvanceMenu(){
+        final String[] options={"📍 RILEVA COORDINATE","✏️ MODIFICA COORDINATE","🧪 TEST PUNTO"};
+        new AlertDialog.Builder(this).setTitle("AVANZAMENTO RIGA").setItems(options,(d,w)->{
+            if(w==0){
+                Intent i=new Intent("com.codybot.DETECT_ADVANCE_COORDINATES");i.setPackage(getPackageName());sendBroadcast(i);
+                status.setText("📍 RILEVAMENTO COORDINATE AVVIATO");
+            } else if(w==1) editAdvancePoint();
+            else {
+                Intent i=new Intent("com.codybot.TEST_ADVANCE_POINT");i.setPackage(getPackageName());sendBroadcast(i);
+                status.setText("🧪 TEST PUNTO AVANZAMENTO INVIATO");
+            }
+        }).show();
+    }
+
+    private void showSettingsMenu(){
+        final String[] options={"🪟 ATTIVA SOVRAPPOSIZIONE","♿ ATTIVA ACCESSIBILITÀ","✕ CHIUDI CODYBOT"};
+        new AlertDialog.Builder(this).setTitle("IMPOSTAZIONI").setItems(options,(d,w)->{
+            if(w==0) openOverlaySettings();
+            else if(w==1){
+                try{startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));}
+                catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}
+            } else {
+                try{
+                    sendBroadcast(new Intent("com.codybot.HIDE_OVERLAY"));
+                    Intent s=new Intent(this,ScreenCaptureService.class);
+                    s.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);
+                    startService(s);
+                }catch(Exception ignored){}
+                finishAffinity();
+            }
+        }).show();
+    }
+
     private void editAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);EditText ex=new EditText(this);ex.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ex.setHint("X");ex.setText(String.valueOf(Math.round(p.getFloat("x",1016f))));EditText ey=new EditText(this);ey.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ey.setHint("Y");ey.setText(String.valueOf(Math.round(p.getFloat("y",1559f))));LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(30,0,30,0);box.addView(ex);box.addView(ey);new AlertDialog.Builder(this).setTitle("Coordinata avanzamento riga").setMessage("Valori predefiniti: X 1016, Y 1559").setView(box).setPositiveButton("SALVA",(d,w)->{try{float x=Float.parseFloat(ex.getText().toString()),y=Float.parseFloat(ey.getText().toString());if(x<0||y<0)throw new Exception();p.edit().putFloat("x",x).putFloat("y",y).apply();status.setText("✅ COORDINATE SALVATE\nX = "+Math.round(x)+"\nY = "+Math.round(y));}catch(Exception e){status.setText("❌ Coordinate non valide");}}).setNegativeButton("ANNULLA",null).show();}
     private void chooseMultiRowSchemaLength(){final String[] lengths=new String[18];for(int i=0;i<18;i++)lengths[i]=String.valueOf(i+3);new AlertDialog.Builder(this).setTitle("CALIBRAZIONE SCHEMA").setSingleChoiceItems(lengths,-1,(d,w)->{int len=w+3;d.dismiss();Intent i=new Intent(this,SchemaCalibrationService.class);i.setAction(SchemaCalibrationService.ACTION_START);i.putExtra(SchemaCalibrationService.EXTRA_LENGTH,len);startService(i);status.setText("📐 CALIBRAZIONE SCHEMA AVVIATA\n\n"+len+" lettere per parola.\nIl numero di parole è variabile.");}).show();}
     private void importKeyboardCalibration(){ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cb==null||!cb.hasPrimaryClip()){new AlertDialog.Builder(this).setTitle("Importa calibrazione").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK",null).show();return;}String raw=cb.getPrimaryClip().getItemAt(0).coerceToText(this).toString();EditText e=new EditText(this);e.setText(raw);e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(12);new AlertDialog.Builder(this).setTitle("Importa calibrazione tastiera").setMessage("Puoi modificare liberamente le coordinate prima di salvarle.").setView(e).setPositiveButton("SALVA",(d,w)->{Intent i=new Intent("com.codybot.IMPORT_KEYBOARD");i.setPackage(getPackageName());i.putExtra("data",e.getText().toString());sendBroadcast(i);}).setNegativeButton("ANNULLA",null).show();}
