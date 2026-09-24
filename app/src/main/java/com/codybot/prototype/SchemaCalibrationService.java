@@ -42,7 +42,7 @@ public class SchemaCalibrationService extends Service {
     private void finishSchema(){if(currentRow.size()>0){updateStatus("⚠️ Completa o sospendi la riga "+activeRow+" prima di terminare.");return;}if(rows.isEmpty()){updateStatus("⚠️ Nessuna riga acquisita.");return;}saveRows();removeAllOverlays();updateStatus("✅ CALIBRAZIONE SCHEMA COMPLETATA\n"+length+" lettere per parola\n"+rows.size()+" righe acquisite");handler.postDelayed(this::stopSelf,800);}
     private void saveRows(){
         Map<Integer,List<int[]>> normalized=normalizeRows(rows);
-        StringBuilder out=new StringBuilder("CODYBOT_SCHEMA_V3|").append(length).append('\\n');
+        StringBuilder out=new StringBuilder("CODYBOT_SCHEMA_V3|").append(length).append('\n');
         for(Map.Entry<Integer,List<int[]>> e:normalized.entrySet()){
             out.append("ROW|").append(e.getKey()).append('|');
             List<int[]> row=e.getValue();
