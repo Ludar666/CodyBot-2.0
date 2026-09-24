@@ -105,7 +105,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
   t.setTextColor(Color.WHITE); t.setTextSize(20); t.setGravity(Gravity.CENTER);
   p.addView(t,new LinearLayout.LayoutParams(-1,-2));
   TextView m=new TextView(this);
-  m.setText("1. Apri CodyCross e porta il gioco sulla schermata da testare.\\n\\n2. Quando sei pronto, premi AVVIA TEST qui sotto.\\n\\n3. CodyBot eseguirà un solo tap sulle coordinate salvate.\\n\\nCoordinate salvate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
+  m.setText("1. Apri CodyCross e porta il gioco sulla schermata da testare.\n\n2. Quando sei pronto, premi AVVIA TEST qui sotto.\n\n3. CodyBot eseguirà un solo tap sulle coordinate salvate.\n\nCoordinate salvate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
   m.setTextColor(Color.WHITE); m.setTextSize(16); m.setPadding(0,20,0,20);
   p.addView(m,new LinearLayout.LayoutParams(-1,-2));
   LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER);
@@ -117,12 +117,12 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
    overlayHidden=true;
    if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}
    overlayView=null; statusText=null;
-   updateOverlayText("🧪 TEST COORDINATE IN CORSO\\nTap su X = "+Math.round(advanceX)+"  Y = "+Math.round(advanceY));
+   updateOverlayText("🧪 TEST COORDINATE IN CORSO\nTap su X = "+Math.round(advanceX)+"  Y = "+Math.round(advanceY));
    handler.postDelayed(()->{
     tap(advanceX,advanceY);
     handler.postDelayed(()->{
      overlayHidden=false;
-     updateOverlayText("✅ TEST COORDINATE ESEGUITO\\nX = "+Math.round(advanceX)+"\\nY = "+Math.round(advanceY));
+     updateOverlayText("✅ TEST COORDINATE ESEGUITO\nX = "+Math.round(advanceX)+"\nY = "+Math.round(advanceY));
      handler.postDelayed(overlayChecker,250);
     },250);
    },250);
@@ -148,7 +148,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
   t.setTextColor(Color.WHITE); t.setTextSize(20); t.setGravity(Gravity.CENTER);
   p.addView(t,new LinearLayout.LayoutParams(-1,-2));
   TextView m=new TextView(this);
-  m.setText("1. Apri CodyCross e porta il gioco sulla schermata dello schema.\\n\\n2. Quando sei pronto, premi AVVIA ACQUISIZIONE.\\n\\n3. CodyBot ti chiederà di toccare il centro di «PASSA ALLA RIGA SUCCESSIVA».\\n\\n4. Tocca esattamente il centro del pulsante.\\n\\nLa coordinata verrà salvata e mostrata nel banner CodyBot.");
+  m.setText("1. Apri CodyCross e porta il gioco sulla schermata dello schema.\n\n2. Quando sei pronto, premi AVVIA ACQUISIZIONE.\n\n3. CodyBot ti chiederà di toccare il centro di «PASSA ALLA RIGA SUCCESSIVA».\n\n4. Tocca esattamente il centro del pulsante.\n\nLa coordinata verrà salvata e mostrata nel banner CodyBot.");
   m.setTextColor(Color.WHITE); m.setTextSize(16); m.setPadding(0,20,0,20);
   p.addView(m,new LinearLayout.LayoutParams(-1,-2));
   LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER);
@@ -161,7 +161,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
    overlayHidden=true;
    if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}
    overlayView=null; statusText=null;
-   updateOverlayText("📍 ACQUISIZIONE PRONTA\\nTocca il centro di «PASSA ALLA RIGA SUCCESSIVA»");
+   updateOverlayText("📍 ACQUISIZIONE PRONTA\nTocca il centro di «PASSA ALLA RIGA SUCCESSIVA»");
    handler.postDelayed(this::showAdvanceCoordinateCapture,300);
   });
   r.addView(cancel); r.addView(startButton); p.addView(r);
@@ -178,7 +178,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
   f.setBackgroundColor(Color.TRANSPARENT);
   f.setClickable(true);
   TextView info=new TextView(this);
-  info.setText("📍 RILEVA COORDINATE\\n\\nTocca il centro del pulsante «PASSA ALLA RIGA SUCCESSIVA»");
+  info.setText("📍 RILEVA COORDINATE\n\nTocca il centro del pulsante «PASSA ALLA RIGA SUCCESSIVA»");
   info.setTextColor(Color.WHITE);
   info.setTextSize(17);
   info.setGravity(Gravity.CENTER);
@@ -199,7 +199,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
     saveAdvancePoint(x,y);
     removeCoordinateView();
     overlayHidden=false;
-    updateOverlayText("✅ COORDINATA SALVATA\\nX = "+Math.round(x)+"\\nY = "+Math.round(y));
+    updateOverlayText("✅ COORDINATA SALVATA\nX = "+Math.round(x)+"\nY = "+Math.round(y));
     handler.postDelayed(overlayChecker,250);
     return true;
   });
