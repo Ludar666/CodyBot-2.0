@@ -43,7 +43,7 @@ public class CodyAccessibilityService extends AccessibilityService {
  private static final float DEFAULT_ADVANCE_X=1016f;
  private static final float DEFAULT_ADVANCE_Y=1559f;
  private float advanceX=DEFAULT_ADVANCE_X, advanceY=DEFAULT_ADVANCE_Y;
- private boolean advanceDetectionArmed=false;
+ private boolean advanceDetectionArmed=false;\n private boolean advanceTestArmed=false;
  private View coordinateView;
  private final Runnable overlayChecker=new Runnable(){public void run(){if(overlayHidden)return;if(overlayView==null){if(Settings.canDrawOverlays(CodyAccessibilityService.this))showOverlay();else handler.postDelayed(this,1000);}}};
  private final BroadcastReceiver overlayReceiver=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(i==null)return;if(i.hasExtra("message")&&statusText!=null)statusText.setText(i.getStringExtra("message"));String a=i.getAction();if("com.codybot.FILL_ANSWER".equals(a)){String s=i.getStringExtra("answer");if(s!=null&&!s.trim().isEmpty()&&ScreenCaptureService.isServiceRunning())fillAnswer(s);}else if("com.codybot.STOP_COMPILATION".equals(a))stopCompilation();else if("com.codybot.ARM_TEST_KEYBOARD".equals(a)){armKeyboardTest();}
