@@ -59,7 +59,7 @@ public class MainActivity extends Activity {
 
         menu.addView(mainMenuButton("⌨  CALIBRAZIONE TASTIERA","Calibra, testa, importa o esporta la tastiera",v->showKeyboardMenu()));
         menu.addView(mainMenuButton("▦  CALIBRAZIONE SCHEMI","Acquisisci, testa, importa o esporta gli schemi",v->showSchemaMenu()));
-        menu.addView(mainMenuButton("⌖  AVANZAMENTO RIGA","Rileva, modifica e testa la coordinata di avanzamento",v->showAdvanceMenu()));
+        menu.addView(mainMenuButton("⌖  RILEVAMENTO COORDINATE","Rileva, modifica e testa la coordinata di avanzamento",v->showAdvanceMenu()));
 
         TextView setup=new TextView(this);
         setup.setText("CONFIGURAZIONE");
@@ -175,14 +175,14 @@ public class MainActivity extends Activity {
 
     private void showAdvanceMenu(){
         final String[] options={"📍 RILEVA COORDINATE","✏️ MODIFICA COORDINATE","🧪 TEST PUNTO"};
-        new AlertDialog.Builder(this).setTitle("AVANZAMENTO RIGA").setItems(options,(d,w)->{
+        new AlertDialog.Builder(this).setTitle("RILEVAMENTO COORDINATE").setItems(options,(d,w)->{
             if(w==0){
                 Intent i=new Intent("com.codybot.DETECT_ADVANCE_COORDINATES");i.setPackage(getPackageName());sendBroadcast(i);
                 status.setText("📍 RILEVAMENTO COORDINATE AVVIATO");
             } else if(w==1) editAdvancePoint();
             else {
                 Intent i=new Intent("com.codybot.TEST_ADVANCE_POINT");i.setPackage(getPackageName());sendBroadcast(i);
-                status.setText("🧪 TEST PUNTO AVANZAMENTO INVIATO");
+                status.setText("🧪 TEST COORDINATE INVIATO");
             }
         }).show();
     }
