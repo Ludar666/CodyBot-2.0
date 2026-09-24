@@ -40,7 +40,87 @@ public class SchemaCalibrationService extends Service {
     private void sendAdvanceTap(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);float x=p.getFloat("x",DEFAULT_ADVANCE_X),y=p.getFloat("y",DEFAULT_ADVANCE_Y);Intent i=new Intent("com.codybot.ADVANCE_SCHEMA_ROW");i.setPackage(getPackageName());i.putExtra("x",x);i.putExtra("y",y);sendBroadcast(i);}
     private void showContinueOverlay(){removeAllOverlays();LinearLayout b=new LinearLayout(this);b.setGravity(Gravity.CENTER);b.setPadding(12,8,12,8);b.setBackgroundColor(Color.parseColor("#EE111111"));Button c=new Button(this);c.setText("CONTINUA ACQUISIZIONE");c.setOnClickListener(v->{removeAllOverlays();handler.postDelayed(this::showRowSelector,150);});Button f=new Button(this);f.setText("FINE SCHEMA");f.setOnClickListener(v->finishSchema());b.addView(c);b.addView(f);continueOverlay=b;WindowManager.LayoutParams lp=new WindowManager.LayoutParams(-2,-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);lp.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;lp.y=60;try{wm.addView(continueOverlay,lp);}catch(Exception e){continueOverlay=null;}}
     private void finishSchema(){if(currentRow.size()>0){updateStatus("⚠️ Completa o sospendi la riga "+activeRow+" prima di terminare.");return;}if(rows.isEmpty()){updateStatus("⚠️ Nessuna riga acquisita.");return;}saveRows();removeAllOverlays();updateStatus("✅ CALIBRAZIONE SCHEMA COMPLETATA\n"+length+" lettere per parola\n"+rows.size()+" righe acquisite");handler.postDelayed(this::stopSelf,800);}
-    private void saveRows(){StringBuilder out=new StringBuilder("CODYBOT_SCHEMA_V3|").append(length).append('\n');for(Map.Entry<Integer,List<int[]>> e:rows.entrySet()){out.append("ROW|").append(e.getKey()).append('|');List<int[]> row=e.getValue();for(int i=0;i<row.size();i++){if(i>0)out.append(';');out.append(row.get(i)[0]).append(',').append(row.get(i)[1]);}out.append('\n');}getSharedPreferences("codybot_schema_v3",MODE_PRIVATE).edit().putString("schema_"+length,out.toString()).apply();}
+    private void saveRows(){
+        Map<Integer,List<int[]>> normalized=normalizeRows(rows);
+        StringBuilder out=new StringBuilder("CODYBOT_SCHEMA_V3|").append(length).append('\\n');
+        for(Map.Entry<Integer,List<int[]>> e:normalized.entrySet()){
+            out.append("ROW|").append(e.getKey()).append('|');
+            List<int[]> row=e.getValue();
+            for(int i=0;i<row.size();i++){
+                if(i>0)out.append(';');
+                out.append(row.get(i)[0]).append(',').append(row.get(i)[1]);
+            }
+            out.append('\\n');
+        }
+        getSharedPreferences("codybot_schema_v3",MODE_PRIVATE).edit().putString("schema_"+length,out.toString()).apply();
+    }
+
+    /*
+     * Regolarizza la geometria acquisita:
+     * - X di ogni colonna viene ricavata dalla mediana dei click di quella colonna.
+     * - Le X risultanti vengono poi adattate a una retta x=a+d*colonna, così piccoli
+     *   errori di tocco non deformano la distanza tra le caselle.
+     * - Y di ogni parola viene ricavata dalla mediana dei suoi click: questo conserva
+     *   lo scorrimento verticale della singola parola senza inseguire il singolo tocco.
+     */
+    private Map<Integer,List<int[]>> normalizeRows(Map<Integer,List<int[]>> source){
+        Map<Integer,List<int[]>> out=new LinkedHashMap<>();
+        if(source==null||source.isEmpty())return out;
+
+        int cols=0;
+        for(List<int[]> row:source.values())if(row!=null&&!row.isEmpty()){cols=row.size();break;}
+        if(cols<=0)return out;
+
+        double[] medianX=new double[cols];
+        for(int col=0;col<cols;col++){
+            ArrayList<Integer> values=new ArrayList<>();
+            for(List<int[]> row:source.values()){
+                if(row!=null&&row.size()==cols&&row.get(col)!=null)values.add(row.get(col)[0]);
+            }
+            medianX[col]=median(values);
+        }
+
+        double sumI=0,sumX=0,sumII=0,sumIX=0;
+        for(int i=0;i<cols;i++){
+            sumI+=i; sumX+=medianX[i]; sumII+=(double)i*i; sumIX+=i*medianX[i];
+        }
+        double denom=cols*sumII-sumI*sumI;
+        double d=denom==0?0:(cols*sumIX-sumI*sumX)/denom;
+        double a=cols==0?0:(sumX-d*sumI)/cols;
+        if(d<1){ d=medianSpacing(medianX); a=medianX[0]; }
+
+        for(Map.Entry<Integer,List<int[]>> e:source.entrySet()){
+            List<int[]> row=e.getValue();
+            if(row==null||row.size()!=cols)continue;
+            ArrayList<Integer> ys=new ArrayList<>();
+            for(int[] p:row)if(p!=null&&p.length>=2)ys.add(p[1]);
+            int y=(int)Math.round(median(ys));
+            List<int[]> nr=new ArrayList<>();
+            for(int col=0;col<cols;col++){
+                nr.add(new int[]{(int)Math.round(a+d*col),y});
+            }
+            out.put(e.getKey(),nr);
+        }
+        return out;
+    }
+
+    private double median(List<Integer> values){
+        if(values==null||values.isEmpty())return 0;
+        ArrayList<Integer> v=new ArrayList<>(values);
+        java.util.Collections.sort(v);
+        int n=v.size();
+        return n%2==1?v.get(n/2):(v.get(n/2-1)+v.get(n/2))/2.0;
+    }
+
+    private double medianSpacing(double[] x){
+        if(x==null||x.length<2)return 1;
+        ArrayList<Integer> d=new ArrayList<>();
+        for(int i=1;i<x.length;i++){
+            int delta=(int)Math.round(x[i]-x[i-1]);
+            if(delta>10) d.add(delta);
+        }
+        return d.isEmpty()?1:median(d);
+    }
     private void updateStatus(String text){Intent i=new Intent("com.codybot.UPDATE_OVERLAY");i.setPackage(getPackageName());i.putExtra("message",text);sendBroadcast(i);}
     private void addOverlay(View v,int width,int height,int gravity,int y,boolean touchable){overlay=v;WindowManager.LayoutParams lp=new WindowManager.LayoutParams(width,height,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,touchable?WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN:WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);lp.gravity=gravity;lp.y=y;try{wm.addView(v,lp);}catch(Exception e){overlay=null;}}
     private void removeMainOverlay(){if(overlay!=null){try{wm.removeView(overlay);}catch(Exception ignored){}overlay=null;}}
