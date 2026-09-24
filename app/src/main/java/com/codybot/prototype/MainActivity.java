@@ -210,8 +210,69 @@ public class MainActivity extends Activity {
 
     private void editAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);EditText ex=new EditText(this);ex.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ex.setHint("X");ex.setText(String.valueOf(Math.round(p.getFloat("x",1016f))));EditText ey=new EditText(this);ey.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ey.setHint("Y");ey.setText(String.valueOf(Math.round(p.getFloat("y",1559f))));LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(30,0,30,0);box.addView(ex);box.addView(ey);new AlertDialog.Builder(this).setTitle("Coordinata avanzamento riga").setMessage("Valori predefiniti: X 1016, Y 1559").setView(box).setPositiveButton("SALVA",(d,w)->{try{float x=Float.parseFloat(ex.getText().toString()),y=Float.parseFloat(ey.getText().toString());if(x<0||y<0)throw new Exception();p.edit().putFloat("x",x).putFloat("y",y).apply();status.setText("✅ COORDINATE SALVATE\nX = "+Math.round(x)+"\nY = "+Math.round(y));}catch(Exception e){status.setText("❌ Coordinate non valide");}}).setNegativeButton("ANNULLA",null).show();}
     private void chooseMultiRowSchemaLength(){final String[] lengths=new String[18];for(int i=0;i<18;i++)lengths[i]=String.valueOf(i+3);new AlertDialog.Builder(this).setTitle("CALIBRAZIONE SCHEMA").setSingleChoiceItems(lengths,-1,(d,w)->{int len=w+3;d.dismiss();Intent i=new Intent(this,SchemaCalibrationService.class);i.setAction(SchemaCalibrationService.ACTION_START);i.putExtra(SchemaCalibrationService.EXTRA_LENGTH,len);startService(i);status.setText("📐 CALIBRAZIONE SCHEMA AVVIATA\n\n"+len+" lettere per parola.\nIl numero di parole è variabile.");}).show();}
-    private void importKeyboardCalibration(){EditText e=new EditText(this);e.setText("");e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setHint("Incolla qui la calibrazione tastiera...");e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(14);new AlertDialog.Builder(this).setTitle("Importa calibrazione tastiera").setMessage("Incolla manualmente il testo esportato. Il campo parte vuoto e viene salvato solo premendo SALVA.").setView(e).setPositiveButton("SALVA",(d,w)->{Intent i=new Intent("com.codybot.IMPORT_KEYBOARD");i.setPackage(getPackageName());i.putExtra("data",e.getText().toString());sendBroadcast(i);status.setText("📥 IMPORTAZIONE TASTIERA IN CORSO...");}).setNegativeButton("ANNULLA",null).show();}
-    private void importSchemaCalibration(){EditText e=new EditText(this);e.setText("");e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setHint("Incolla qui lo schema CODYBOT_SCHEMA_V3...");e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(16);new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Incolla manualmente il testo esportato. Il campo parte vuoto e viene salvato solo premendo SALVA.").setView(e).setPositiveButton("SALVA",(d,w)->saveImportedSchemaV3(e.getText().toString())).setNegativeButton("ANNULLA",null).show();}
+    private void importKeyboardCalibration(){
+ EditText e=new EditText(this);
+ e.setText("");
+ e.setTextSize(14);
+ e.setGravity(android.view.Gravity.TOP);
+ e.setHint("A = X, Y\\nB = X, Y\\n...\\nZ = X, Y");
+ e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+ e.setMinLines(10);
+ ScrollView sv=new ScrollView(this);
+ sv.setPadding(18,0,18,0);
+ sv.addView(e,new ScrollView.LayoutParams(-1,420));
+ new AlertDialog.Builder(this).setTitle("Importa coordinate tastiera")
+   .setMessage("Incolla le 26 righe A-Z. Le coordinate vengono salvate direttamente premendo SALVA.")
+   .setView(sv)
+   .setPositiveButton("SALVA",(d,w)->saveImportedKeyboard(e.getText().toString()))
+   .setNegativeButton("ANNULLA",null).show();
+}
+private void saveImportedKeyboard(String raw){
+ try{
+  if(raw==null||raw.trim().isEmpty())throw new IllegalArgumentException();
+  String[] lines=raw.split("\\r?\\n"); float[] c=new float[52]; boolean[] seen=new boolean[26];
+  for(String line:lines){
+   String t=line.trim(); int eq=t.indexOf('=');
+   if(eq<0)continue;
+   String left=t.substring(0,eq).trim();
+   if(left.length()!=1)continue;
+   int p="ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(Character.toUpperCase(left.charAt(0)));
+   if(p<0)continue;
+   String[] xy=t.substring(eq+1).trim().split(",");
+   if(xy.length<2)throw new IllegalArgumentException();
+   c[p*2]=Float.parseFloat(xy[0].trim());
+   c[p*2+1]=Float.parseFloat(xy[1].trim());
+   seen[p]=true;
+  }
+  for(boolean ok:seen)if(!ok)throw new IllegalArgumentException();
+  android.content.SharedPreferences p=getSharedPreferences("codybot_keyboard",MODE_PRIVATE);
+  p.edit().putString("centers",joinKeyboardCoordinates(c)).putInt("width",getResources().getDisplayMetrics().widthPixels).putInt("height",getResources().getDisplayMetrics().heightPixels).apply();
+  status.setText("✅ COORDINATE TASTIERA SALVATE\\n26/26 coordinate");
+ }catch(Exception ex){
+  status.setText("❌ COORDINATE NON SALVATE\\nFormato richiesto: A = X, Y ... Z = X, Y");
+ }
+}
+private String joinKeyboardCoordinates(float[] c){
+ StringBuilder sb=new StringBuilder();
+ for(int i=0;i<c.length;i++){if(i>0)sb.append(',');sb.append(c[i]);}
+ return sb.toString();
+}
+    private void importSchemaCalibration(){
+ EditText e=new EditText(this);
+ e.setText("");
+ e.setTextSize(13);
+ e.setGravity(android.view.Gravity.TOP);
+ e.setHint("CODYBOT_SCHEMA_V3|9\\nROW|1|...\\nROW|2|...");
+ e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+ ScrollView sv=new ScrollView(this);
+ sv.setPadding(18,0,18,0);
+ sv.addView(e,new ScrollView.LayoutParams(-1,520));
+ new AlertDialog.Builder(this).setTitle("Importa coordinate schema")
+   .setMessage("Incolla lo schema completo. Il campo parte vuoto e SALVA rimane sempre visibile.")
+   .setView(sv)
+   .setPositiveButton("SALVA",(d,w)->saveImportedSchemaV3(e.getText().toString()))
+   .setNegativeButton("ANNULLA",null).show();
+}
     private void saveImportedSchemaV3(String raw){
         try{
             String[] lines=raw.split("\\r?\\n");
