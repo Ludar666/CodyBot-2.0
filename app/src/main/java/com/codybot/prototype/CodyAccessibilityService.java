@@ -45,7 +45,7 @@ public class CodyAccessibilityService extends AccessibilityService {
  private float advanceX=DEFAULT_ADVANCE_X, advanceY=DEFAULT_ADVANCE_Y;
  private boolean advanceDetectionArmed=false;
  private boolean advanceTestArmed=false;
- private View coordinateView;
+ private View coordinateView; private View advanceTestControls; private TextView advanceTestStatus; private boolean advanceTestRunning=false; private boolean advanceTestPaused=false; private Runnable advanceTestAction;
  private final Runnable overlayChecker=new Runnable(){public void run(){if(overlayHidden)return;if(overlayView==null){if(Settings.canDrawOverlays(CodyAccessibilityService.this))showOverlay();else handler.postDelayed(this,1000);}}};
  private final BroadcastReceiver overlayReceiver=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(i==null)return;if(i.hasExtra("message")&&statusText!=null)statusText.setText(i.getStringExtra("message"));String a=i.getAction();if("com.codybot.FILL_ANSWER".equals(a)){String s=i.getStringExtra("answer");if(s!=null&&!s.trim().isEmpty()&&ScreenCaptureService.isServiceRunning())fillAnswer(s);}else if("com.codybot.STOP_COMPILATION".equals(a))stopCompilation();else if("com.codybot.ARM_TEST_KEYBOARD".equals(a)){armKeyboardTest();}
 else if("com.codybot.TEST_KEYBOARD".equals(a)){runKeyboardTest();}else if("com.codybot.CALIBRATE_KEYBOARD".equals(a))startManualKeyboardCalibration();else if("com.codybot.CALIBRATE_SCHEMA".equals(a)){int n=i.getIntExtra("length",0);if(n>0)startSchemaCalibration(n);}else if("com.codybot.TEST_SCHEMA".equals(a)){int n=i.getIntExtra("length",0);if(n>0)testSchemaCalibration(n);}else if("com.codybot.EXPORT_SCHEMA".equals(a))exportSchemaCalibration();else if("com.codybot.IMPORT_KEYBOARD".equals(a))importKeyboardCalibration(i.getStringExtra("data"));else if("com.codybot.IMPORT_SCHEMA".equals(a))importSchemaCalibration(i.getStringExtra("data"));else if("com.codybot.HIDE_OVERLAY".equals(a))hideOverlay();else if("com.codybot.ADVANCE_SCHEMA_ROW".equals(a)){float x=i.hasExtra("x")?i.getFloatExtra("x",advanceX):advanceX;float y=i.hasExtra("y")?i.getFloatExtra("y",advanceY):advanceY;tap(x,y);updateOverlayText("📍 TAP COORDINATE: "+Math.round(x)+", "+Math.round(y));}else if("com.codybot.TEST_ADVANCE_POINT".equals(a)){testAdvancePoint();}else if("com.codybot.DETECT_ADVANCE_COORDINATES".equals(a)){startAdvanceCoordinateDetection();}}};
@@ -95,45 +95,137 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
   stopCompilation();
   loadAdvancePoint();
   if(coordinateView!=null)removeCoordinateView();
+  advanceTestRunning=false;
+  advanceTestPaused=false;
   LinearLayout p=new LinearLayout(this);
   p.setOrientation(LinearLayout.VERTICAL);
   p.setGravity(Gravity.CENTER_HORIZONTAL);
   p.setPadding(28,24,28,24);
   p.setBackgroundColor(Color.parseColor("#EE111111"));
+
   TextView t=new TextView(this);
   t.setText("🧪 TEST COORDINATE");
   t.setTextColor(Color.WHITE); t.setTextSize(20); t.setGravity(Gravity.CENTER);
   p.addView(t,new LinearLayout.LayoutParams(-1,-2));
+
   TextView m=new TextView(this);
-  m.setText("1. Apri CodyCross e porta il gioco sulla schermata da testare.\n\n2. Quando sei pronto, premi AVVIA TEST qui sotto.\n\n3. CodyBot eseguirà un solo tap sulle coordinate salvate.\n\nCoordinate salvate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
+  m.setText("1. Apri CodyCross e portalo sulla schermata da testare.\\n\\n2. Quando sei pronto, premi AVVIA TEST.\\n\\n3. CodyBot eseguirà un solo tap sulle coordinate salvate.\\n\\nCoordinate salvate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
   m.setTextColor(Color.WHITE); m.setTextSize(16); m.setPadding(0,20,0,20);
   p.addView(m,new LinearLayout.LayoutParams(-1,-2));
+
   LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER);
   Button cancel=new Button(this); cancel.setText("ANNULLA");
   cancel.setOnClickListener(v->removeCoordinateView());
   Button start=new Button(this); start.setText("AVVIA TEST");
   start.setOnClickListener(v->{
-   removeCoordinateView();
-   overlayHidden=true;
-   if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}
-   overlayView=null; statusText=null;
-   updateOverlayText("🧪 TEST COORDINATE IN CORSO\nTap su X = "+Math.round(advanceX)+"  Y = "+Math.round(advanceY));
-   handler.postDelayed(()->{
-    tap(advanceX,advanceY);
-    handler.postDelayed(()->{
-     overlayHidden=false;
-     updateOverlayText("✅ TEST COORDINATE ESEGUITO\nX = "+Math.round(advanceX)+"\nY = "+Math.round(advanceY));
-     handler.postDelayed(overlayChecker,250);
-    },250);
-   },250);
+    removeCoordinateView();
+    startAdvanceTest();
   });
   r.addView(cancel); r.addView(start); p.addView(r);
+
   coordinateView=p;
   DisplayMetrics dm=getResources().getDisplayMetrics();
-  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(dm.widthPixels*.92f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(dm.widthPixels*.92f),-2,
+    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+    PixelFormat.TRANSLUCENT);
   q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=120;
-  try{windowManager.addView(coordinateView,q);}catch(Exception e){coordinateView=null;updateOverlayText("❌ Errore test: "+e.getClass().getSimpleName());}
+  try{windowManager.addView(coordinateView,q);}
+  catch(Exception e){coordinateView=null;updateOverlayText("❌ Errore test: "+e.getClass().getSimpleName());}
  }
+
+ private void startAdvanceTest(){
+  loadAdvancePoint();
+  advanceTestRunning=true;
+  advanceTestPaused=false;
+
+  LinearLayout p=new LinearLayout(this);
+  p.setOrientation(LinearLayout.VERTICAL);
+  p.setGravity(Gravity.CENTER_HORIZONTAL);
+  p.setPadding(20,14,20,14);
+  p.setBackgroundColor(Color.parseColor("#EE111111"));
+
+  advanceTestStatus=new TextView(this);
+  advanceTestStatus.setText("🧪 TEST IN PREPARAZIONE\\nCoordinate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY)+"\\nAttendi...");
+  advanceTestStatus.setTextColor(Color.WHITE);
+  advanceTestStatus.setTextSize(15);
+  advanceTestStatus.setGravity(Gravity.CENTER);
+  p.addView(advanceTestStatus,new LinearLayout.LayoutParams(-1,-2));
+
+  LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER);
+  Button pause=new Button(this); pause.setText("⏸ SOSPENDI");
+  Button resume=new Button(this); resume.setText("▶ RIPRENDI");
+  Button stop=new Button(this); stop.setText("⏹ TERMINA");
+  pause.setOnClickListener(v->pauseAdvanceTest());
+  resume.setOnClickListener(v->resumeAdvanceTest());
+  stop.setOnClickListener(v->stopAdvanceTest());
+  r.addView(pause); r.addView(resume); r.addView(stop); p.addView(r);
+
+  advanceTestControls=p;
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams(
+    (int)(getResources().getDisplayMetrics().widthPixels*.94f),-2,
+    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+    PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=70;
+  try{windowManager.addView(advanceTestControls,q);}
+  catch(Exception e){advanceTestControls=null;advanceTestStatus=null;advanceTestRunning=false;updateOverlayText("❌ Impossibile avviare il test: "+e.getClass().getSimpleName());return;}
+
+  // Lasciamo il gioco completamente accessibile e diamo un breve intervallo
+  // prima del tap, così il pannello non interferisce con la schermata da testare.
+  scheduleAdvanceTestTap(900);
+ }
+
+ private void scheduleAdvanceTestTap(long delay){
+  if(!advanceTestRunning||advanceTestPaused)return;
+  if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);
+  advanceTestAction=()->{
+    if(!advanceTestRunning||advanceTestPaused)return;
+    if(advanceTestStatus!=null)advanceTestStatus.setText("🧪 TEST IN CORSO\\nEseguo tap su X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
+    tap(advanceX,advanceY,new GestureResultCallback(){
+      @Override public void onCompleted(GestureDescription g){
+        if(!advanceTestRunning)return;
+        if(advanceTestStatus!=null)advanceTestStatus.setText("✅ TAP ESEGUITO\\nX = "+Math.round(advanceX)+"\\nY = "+Math.round(advanceY));
+      }
+      @Override public void onCancelled(GestureDescription g){
+        if(!advanceTestRunning)return;
+        if(advanceTestStatus!=null)advanceTestStatus.setText("❌ TAP ANNULLATO\\nAndroid non ha eseguito il gesto.\\nPremi RIPRENDI per riprovare.");
+      }
+    });
+  };
+  handler.postDelayed(advanceTestAction,delay);
+ }
+
+ private void pauseAdvanceTest(){
+  if(!advanceTestRunning)return;
+  advanceTestPaused=true;
+  if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);
+  if(advanceTestStatus!=null)advanceTestStatus.setText("⏸ TEST SOSPESO\\nIl test è in pausa.\\nPremi RIPRENDI per continuare.");
+ }
+
+ private void resumeAdvanceTest(){
+  if(!advanceTestRunning)return;
+  advanceTestPaused=false;
+  if(advanceTestStatus!=null)advanceTestStatus.setText("▶ TEST RIPRESO\\nPreparazione del tap...");
+  scheduleAdvanceTestTap(400);
+ }
+
+ private void stopAdvanceTest(){
+  advanceTestRunning=false;
+  advanceTestPaused=false;
+  if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);
+  advanceTestAction=null;
+  removeAdvanceTestControls();
+  updateOverlayText("⏹ TEST COORDINATE TERMINATO");
+  handler.postDelayed(overlayChecker,250);
+ }
+
+ private void removeAdvanceTestControls(){
+  if(advanceTestControls!=null&&windowManager!=null)try{windowManager.removeView(advanceTestControls);}catch(Exception ignored){}
+  advanceTestControls=null;
+  advanceTestStatus=null;
+ }
+
  private void startAdvanceCoordinateDetection(){
   stopCompilation();
   if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}
@@ -161,7 +253,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
    overlayHidden=true;
    if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}
    overlayView=null; statusText=null;
-   updateOverlayText("📍 ACQUISIZIONE PRONTA\nTocca il centro di «PASSA ALLA RIGA SUCCESSIVA»");
+   updateOverlayText("📍 ACQUISIZIONE PRONTA\nTocca un punto per acquisirne le coordinate.");
    handler.postDelayed(this::showAdvanceCoordinateCapture,300);
   });
   r.addView(cancel); r.addView(startButton); p.addView(r);
@@ -178,7 +270,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
   f.setBackgroundColor(Color.TRANSPARENT);
   f.setClickable(true);
   TextView info=new TextView(this);
-  info.setText("📍 RILEVA COORDINATE\n\nTocca il centro del pulsante «PASSA ALLA RIGA SUCCESSIVA»");
+  info.setText("📍 RILEVA COORDINATE\n\nTocca un punto per acquisirne le coordinate.");
   info.setTextColor(Color.WHITE);
   info.setTextSize(17);
   info.setGravity(Gravity.CENTER);
@@ -491,9 +583,9 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
  private void scheduleAnswerTaps(String clean,java.util.Set<Integer> existing){if(!compiling)return;DisplayMetrics dm=getResources().getDisplayMetrics();float w=dm.widthPixels,h=dm.heightPixels;int index=0,skipped=0;for(int i=0;i<clean.length();i++){if(existing.contains(i)){skipped++;continue;}final char c=clean.charAt(i);final float[] xy=calibratedKeyCenter(c,w,h);if(xy==null){updateOverlayText("⚠️ Nessuna coordinata calibrata per "+c+"\\nEsegui CALIBRA TASTIERA prima di compilare.");compiling=false;pendingCompilation.clear();calibratedCenters=null;return;}final long d=index*240L;index++;Runnable r=()->{if(compiling&&ScreenCaptureService.isServiceRunning())tap(xy[0],xy[1]);};pendingCompilation.add(r);handler.postDelayed(r,d);}final int n=clean.length(),s=skipped;Runnable f=()->{if(!compiling)return;compiling=false;pendingCompilation.clear();calibratedCenters=null;ScreenCaptureService.resetLastClue();updateOverlayText("✅ COMPILATA: "+clean+"\\nGià presenti: "+s+"/"+n);};pendingCompilation.add(f);handler.postDelayed(f,Math.max(300,index*240L+300L));}
  private float[] calibratedKeyCenter(char c,float w,float h){String a="QWERTYUIOP",b="ASDFGHJKL",d="ZXCVBNM";int i;if(manualCalibrationCenters!=null&&manualCalibrationCenters.length==52){int p=calibrationLetters.indexOf(c);if(p>=0)return new float[]{manualCalibrationCenters[p*2],manualCalibrationCenters[p*2+1]};}return null;}
  private float[] keyCenter(char c,float w,float h){String a="QWERTYUIOP",b="ASDFGHJKL",d="ZXCVBNM";int i;if((i=a.indexOf(c))>=0)return new float[]{w*(.05f+i*.10f),h*.77f};if((i=b.indexOf(c))>=0)return new float[]{w*(.10f+i*.10f),h*.855f};if((i=d.indexOf(c))>=0)return new float[]{w*(.25f+i*.10f),h*.94f};return null;}
- private void tap(float x,float y){Path p=new Path();p.moveTo(x,y);GestureDescription.StrokeDescription s=new GestureDescription.StrokeDescription(p,0,60);dispatchGesture(new GestureDescription.Builder().addStroke(s).build(),null,null);}
+ private void tap(float x,float y){tap(x,y,null);}\n private void tap(float x,float y,GestureResultCallback callback){Path p=new Path();p.moveTo(x,y);GestureDescription.StrokeDescription s=new GestureDescription.StrokeDescription(p,0,80);GestureDescription g=new GestureDescription.Builder().addStroke(s).build();boolean accepted=dispatchGesture(g,callback,null);if(!accepted&&advanceTestStatus!=null)advanceTestStatus.setText("❌ TAP RIFIUTATO\nIl servizio Accessibilità non ha accettato il gesto.\nVerifica che CodyBot sia attivo nelle impostazioni Accessibilità.");}
  private void stopCompilation(){for(Runnable r:pendingCompilation)handler.removeCallbacks(r);pendingCompilation.clear();compiling=false;if(statusText!=null)statusText.setText("🔴 STOP");}
  private void updateOverlayText(String m){Intent i=new Intent("com.codybot.UPDATE_OVERLAY");i.setPackage(getPackageName());i.putExtra("message",m);sendBroadcast(i);}
  @Override public void onInterrupt(){}
- @Override public void onDestroy(){overlayHidden=true;stopCompilation();handler.removeCallbacks(overlayChecker);if(recognizer!=null)recognizer.close();try{unregisterReceiver(overlayReceiver);}catch(Exception ignored){}removeCoordinateView();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;super.onDestroy();}
+ @Override public void onDestroy(){overlayHidden=true;stopCompilation();if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);removeAdvanceTestControls();handler.removeCallbacks(overlayChecker);if(recognizer!=null)recognizer.close();try{unregisterReceiver(overlayReceiver);}catch(Exception ignored){}removeCoordinateView();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;super.onDestroy();}
 }
