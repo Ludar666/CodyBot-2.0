@@ -50,7 +50,7 @@ public class SchemaCalibrationService extends Service {
                 if(i>0)out.append(';');
                 out.append(row.get(i)[0]).append(',').append(row.get(i)[1]);
             }
-            out.append('\\n');
+            out.append('\n');
         }
         getSharedPreferences("codybot_schema_v3",MODE_PRIVATE).edit().putString("schema_"+length,out.toString()).apply();
     }
