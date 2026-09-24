@@ -16,243 +16,40 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.text.InputType;
+import java.util.Map;
 
 public class MainActivity extends Activity {
-
     private TextView status;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(50, 50, 50, 50);
-
-        TextView title = new TextView(this);
-        title.setText("CodyBot 3.1");
-        title.setTextSize(26);
-        layout.addView(title);
-
-        status = new TextView(this);
-        status.setTextSize(16);
-        status.setPadding(0, 30, 0, 30);
-        layout.addView(status);
-
-        Button overlayButton = new Button(this);
-        overlayButton.setText("1. ATTIVA SOVRAPPOSIZIONE");
-        overlayButton.setOnClickListener(v -> openOverlaySettings());
-        layout.addView(overlayButton);
-
-        Button accessibilityButton = new Button(this);
-        accessibilityButton.setText("2. ATTIVA ACCESSIBILITÀ");
-        accessibilityButton.setOnClickListener(v -> {
-            try {
-                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-            } catch (Exception e) {
-                startActivity(new Intent(Settings.ACTION_SETTINGS));
-            }
-        });
-        layout.addView(accessibilityButton);
-
-        Button advancedButton = new Button(this);
-        advancedButton.setText("3. STRUMENTI AVANZATI");
-        advancedButton.setOnClickListener(v -> showAdvancedTools());
-        layout.addView(advancedButton);
-
-        Button closeButton = new Button(this);
-        closeButton.setText("CHIUDI CODYBOT");
-        closeButton.setOnClickListener(v -> {
-            try {
-                Intent hideIntent = new Intent("com.codybot.HIDE_OVERLAY");
-                hideIntent.setPackage(getPackageName());
-                sendBroadcast(hideIntent);
-                Intent serviceIntent = new Intent(MainActivity.this, ScreenCaptureService.class);
-                serviceIntent.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);
-                startService(serviceIntent);
-            } catch (Exception ignored) {}
-            finishAffinity();
-        });
-        layout.addView(closeButton);
-
-        setContentView(layout);
-        refreshStatus();
+        LinearLayout layout=new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL); layout.setPadding(50,50,50,50);
+        TextView title=new TextView(this); title.setText("CodyBot 3.1"); title.setTextSize(26); layout.addView(title);
+        status=new TextView(this); status.setTextSize(16); status.setPadding(0,30,0,30); layout.addView(status);
+        Button overlayButton=new Button(this); overlayButton.setText("1. ATTIVA SOVRAPPOSIZIONE"); overlayButton.setOnClickListener(v->openOverlaySettings()); layout.addView(overlayButton);
+        Button accessibilityButton=new Button(this); accessibilityButton.setText("2. ATTIVA ACCESSIBILITÀ"); accessibilityButton.setOnClickListener(v->{try{startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));}catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}}); layout.addView(accessibilityButton);
+        Button advancedButton=new Button(this); advancedButton.setText("3. STRUMENTI AVANZATI"); advancedButton.setOnClickListener(v->showAdvancedTools()); layout.addView(advancedButton);
+        Button closeButton=new Button(this); closeButton.setText("CHIUDI CODYBOT"); closeButton.setOnClickListener(v->{try{sendBroadcast(new Intent("com.codybot.HIDE_OVERLAY")); Intent s=new Intent(this,ScreenCaptureService.class);s.setAction(ScreenCaptureService.ACTION_PAUSE_CAPTURE);startService(s);}catch(Exception ignored){} finishAffinity();}); layout.addView(closeButton);
+        setContentView(layout); refreshStatus();
     }
-
-    private void showAdvancedTools() {
-        final String[] options = {
-                "🔧 CALIBRA TASTIERA",
-                "🧪 TEST TASTIERA",
-                "📤 ESPORTA CALIBRAZIONE",
-                "📥 IMPORTA CALIBRAZIONE",
-                "📐 CALIBRA SCHEMA",
-                "🧪 TEST SCHEMA",
-                "📤 ESPORTA SCHEMA",
-                "📥 IMPORTA SCHEMI"
-        };
-
-        new AlertDialog.Builder(this)
-                .setTitle("Strumenti avanzati")
-                .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        Intent intent = new Intent("com.codybot.CALIBRATE_KEYBOARD");
-                        intent.setPackage(getPackageName());
-                        sendBroadcast(intent);
-                        status.setText("CALIBRAZIONE AVVIATA\n\nTocca A-Z sulla tastiera CodyCross.");
-                    } else if (which == 1) {
-                        Intent testIntent = new Intent("com.codybot.ARM_TEST_KEYBOARD");
-                        testIntent.setPackage(getPackageName());
-                        sendBroadcast(testIntent);
-                        status.setText("🧪 TEST TASTIERA PRONTO\n\nPassa ora a CodyCross.\nIl test A-Z partirà automaticamente quando CodyCross diventa l'app in primo piano.");
-                    } else if (which == 2) {
-                        exportCalibration();
-                    } else if (which == 3) {
-                        importKeyboardCalibration();
-                    } else if (which == 4) {
-                        chooseMultiRowSchemaLength();
-                    } else if (which == 5) {
-                        chooseSchemaLength("TEST SCHEMA", "TEST_SCHEMA");
-                    } else if (which == 6) {
-                        Intent intent = new Intent("com.codybot.EXPORT_SCHEMA");
-                        intent.setPackage(getPackageName());
-                        sendBroadcast(intent);
-                        status.setText("ESPORTAZIONE SCHEMA AVVIATA");
-                    } else if (which == 7) {
-                        importSchemaCalibration();
-                    }
-                })
-                .show();
+    private void showAdvancedTools(){
+        final String[] options={"🔧 CALIBRA TASTIERA","🧪 TEST TASTIERA","📤 ESPORTA CALIBRAZIONE","📥 IMPORTA CALIBRAZIONE","📐 CALIBRA SCHEMA","🧪 TEST SCHEMA","📤 ESPORTA SCHEMA","📥 IMPORTA SCHEMI"};
+        new AlertDialog.Builder(this).setTitle("Strumenti avanzati").setItems(options,(dialog,which)->{
+            if(which==0){Intent i=new Intent("com.codybot.CALIBRATE_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);status.setText("CALIBRAZIONE AVVIATA\n\nTocca A-Z sulla tastiera CodyCross.");}
+            else if(which==1){Intent i=new Intent("com.codybot.ARM_TEST_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);status.setText("🧪 TEST TASTIERA PRONTO\n\nPassa ora a CodyCross.\nIl test A-Z partirà automaticamente quando CodyCross diventa l'app in primo piano.");}
+            else if(which==2)exportCalibration(); else if(which==3)importKeyboardCalibration(); else if(which==4)chooseMultiRowSchemaLength(); else if(which==5)chooseSchemaLength("TEST SCHEMA","TEST_SCHEMA"); else if(which==6)exportSchemaCalibration(); else if(which==7)importSchemaCalibration();
+        }).show();
     }
-
-    private void chooseMultiRowSchemaLength() {
-        final String[] lengths = new String[18];
-        for (int i = 0; i < lengths.length; i++) lengths[i] = String.valueOf(i + 3);
-        new AlertDialog.Builder(this)
-                .setTitle("CALIBRAZIONE SCHEMA")
-                .setSingleChoiceItems(lengths, -1, (dialog, which) -> {
-                    int length = which + 3;
-                    dialog.dismiss();
-                    Intent intent = new Intent(this, SchemaCalibrationService.class);
-                    intent.setAction(SchemaCalibrationService.ACTION_START);
-                    intent.putExtra(SchemaCalibrationService.EXTRA_LENGTH, length);
-                    startService(intent);
-                    status.setText("📐 CALIBRAZIONE SCHEMA AVVIATA\n\n" + length + " lettere per parola.\nIl numero di parole è variabile.");
-                })
-                .show();
-    }
-
-    private void importKeyboardCalibration() {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (clipboard == null || !clipboard.hasPrimaryClip()) {
-            new AlertDialog.Builder(this).setTitle("Importa calibrazione").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK", null).show();
-            return;
-        }
-        CharSequence cs = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
-        final String raw = cs == null ? "" : cs.toString();
-        final EditText editor = new EditText(this);
-        editor.setText(raw);
-        editor.setTextSize(14);
-        editor.setGravity(android.view.Gravity.TOP);
-        editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        editor.setMinLines(12);
-        editor.setSelectAllOnFocus(false);
-        new AlertDialog.Builder(this)
-                .setTitle("Importa calibrazione tastiera")
-                .setMessage("Puoi modificare liberamente le coordinate prima di salvarle.")
-                .setView(editor)
-                .setPositiveButton("SALVA", (d,w) -> {
-                    Intent i=new Intent("com.codybot.IMPORT_KEYBOARD");
-                    i.setPackage(getPackageName());
-                    i.putExtra("data",editor.getText().toString());
-                    sendBroadcast(i);
-                })
-                .setNegativeButton("ANNULLA",null)
-                .show();
-    }
-
-    private void importSchemaCalibration() {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (clipboard == null || !clipboard.hasPrimaryClip()) {
-            new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK", null).show();
-            return;
-        }
-        CharSequence cs = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
-        final String raw = cs == null ? "" : cs.toString();
-        final EditText editor = new EditText(this);
-        editor.setText(raw);
-        editor.setTextSize(14);
-        editor.setGravity(android.view.Gravity.TOP);
-        editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        editor.setMinLines(14);
-        editor.setSelectAllOnFocus(false);
-        new AlertDialog.Builder(this)
-                .setTitle("Importa schemi")
-                .setMessage("Puoi modificare le coordinate degli schemi prima di salvarle.")
-                .setView(editor)
-                .setPositiveButton("SALVA", (d,w) -> {
-                    Intent i=new Intent("com.codybot.IMPORT_SCHEMA");
-                    i.setPackage(getPackageName());
-                    i.putExtra("data",editor.getText().toString());
-                    sendBroadcast(i);
-                })
-                .setNegativeButton("ANNULLA",null)
-                .show();
-    }
-
-    private void chooseSchemaLength(String title, String action) {
-        final String[] lengths = new String[18];
-        for (int i = 0; i < lengths.length; i++) lengths[i] = String.valueOf(i + 3);
-        new AlertDialog.Builder(this)
-                .setTitle(title + " - numero lettere")
-                .setItems(lengths, (dialog, which) -> {
-                    int length = which + 3;
-                    Intent intent = new Intent("com.codybot." + action);
-                    intent.setPackage(getPackageName());
-                    intent.putExtra("length", length);
-                    sendBroadcast(intent);
-                    status.setText(title + " avviata\n\nSchema da " + length + " lettere.");
-                })
-                .show();
-    }
-
-    private void exportCalibration() {
-        String raw = getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getString("centers", null);
-        if (raw == null || raw.trim().isEmpty()) {
-            new AlertDialog.Builder(this).setTitle("Esporta calibrazione").setMessage("Nessuna calibrazione salvata. Esegui prima CALIBRA TASTIERA.").setPositiveButton("OK", null).show();
-            return;
-        }
-        String[] parts = raw.split(",");
-        if (parts.length != 52) {
-            new AlertDialog.Builder(this).setTitle("Esporta calibrazione").setMessage("La calibrazione salvata non è valida.").setPositiveButton("OK", null).show();
-            return;
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append("CodyBot - Calibrazione tastiera\n");
-        sb.append("Schermo: ").append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("width", 0)).append(" x ").append(getSharedPreferences("codybot_keyboard", MODE_PRIVATE).getInt("height", 0)).append("\n\n");
-        String letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        for (int i = 0; i < 26; i++) sb.append(letters.charAt(i)).append(" = ").append(Math.round(Float.parseFloat(parts[i * 2]))).append(", ").append(Math.round(Float.parseFloat(parts[i * 2 + 1]))).append("\n");
-        final String exportText = sb.toString();
-        new AlertDialog.Builder(this).setTitle("Calibrazione salvata").setMessage(exportText).setPositiveButton("COPIA", (d, w) -> { ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE); cb.setPrimaryClip(ClipData.newPlainText("CodyBot calibrazione",exportText)); status.setText("✅ COORDINATE COPIATE NEGLI APPUNTI"); }).setNegativeButton("CHIUDI", null).show();
-    }
-
-    private void openOverlaySettings() {
-        try {
-            if (!Settings.canDrawOverlays(this)) startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
-        } catch (Exception e) { startActivity(new Intent(Settings.ACTION_SETTINGS)); }
-    }
-
-    private boolean isAccessibilityEnabled() {
-        String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        if (enabled == null) return false;
-        String expected = new ComponentName(this, CodyAccessibilityService.class).flattenToString();
-        return enabled.contains(expected);
-    }
-
-    private void refreshStatus() {
-        boolean overlay = Settings.canDrawOverlays(this);
-        boolean accessibility = isAccessibilityEnabled();
-        status.setText("Sovrapposizione: " + (overlay ? "ATTIVA ✓" : "NON ATTIVA ✗") + "\nAccessibilità: " + (accessibility ? "ATTIVA ✓" : "NON ATTIVA ✗") + "\n\nPer vedere CodyBot sopra CodyCross devono essere attive ENTRAMBE.");
-    }
-
-    @Override protected void onResume() { super.onResume(); if (status != null) refreshStatus(); }
+    private void chooseMultiRowSchemaLength(){final String[] lengths=new String[18];for(int i=0;i<18;i++)lengths[i]=String.valueOf(i+3);new AlertDialog.Builder(this).setTitle("CALIBRAZIONE SCHEMA").setSingleChoiceItems(lengths,-1,(d,w)->{int len=w+3;d.dismiss();Intent i=new Intent(this,SchemaCalibrationService.class);i.setAction(SchemaCalibrationService.ACTION_START);i.putExtra(SchemaCalibrationService.EXTRA_LENGTH,len);startService(i);status.setText("📐 CALIBRAZIONE SCHEMA AVVIATA\n\n"+len+" lettere per parola.\nIl numero di parole è variabile.");}).show();}
+    private void importKeyboardCalibration(){ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cb==null||!cb.hasPrimaryClip()){new AlertDialog.Builder(this).setTitle("Importa calibrazione").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK",null).show();return;}String raw=cb.getPrimaryClip().getItemAt(0).coerceToText(this).toString();EditText e=new EditText(this);e.setText(raw);e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(12);new AlertDialog.Builder(this).setTitle("Importa calibrazione tastiera").setMessage("Puoi modificare liberamente le coordinate prima di salvarle.").setView(e).setPositiveButton("SALVA",(d,w)->{Intent i=new Intent("com.codybot.IMPORT_KEYBOARD");i.setPackage(getPackageName());i.putExtra("data",e.getText().toString());sendBroadcast(i);}).setNegativeButton("ANNULLA",null).show();}
+    private void importSchemaCalibration(){ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cb==null||!cb.hasPrimaryClip()){new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK",null).show();return;}String raw=cb.getPrimaryClip().getItemAt(0).coerceToText(this).toString();EditText e=new EditText(this);e.setText(raw);e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(14);new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Formato CODYBOT_SCHEMA_V3. Puoi modificare le coordinate prima di salvarle.").setView(e).setPositiveButton("SALVA",(d,w)->saveImportedSchemaV3(e.getText().toString())).setNegativeButton("ANNULLA",null).show();}
+    private void saveImportedSchemaV3(String raw){try{String[] lines=raw.split("\\r?\\n");String current=null;int rows=0;for(String line:lines){String t=line.trim();if(t.startsWith("CODYBOT_SCHEMA_V3|")){current=t.substring(t.indexOf('|')+1).trim();if(current.length()==0)throw new IllegalArgumentException();}else if(t.startsWith("ROW|")){if(current==null)throw new IllegalArgumentException();String[] p=t.split("\\|",3);if(p.length!=3||Integer.parseInt(p[1])<1||p[2].trim().isEmpty())throw new IllegalArgumentException();String[] cells=p[2].split(";");if(cells.length!=Integer.parseInt(current))throw new IllegalArgumentException();for(String cell:cells){String[] xy=cell.split(",");if(xy.length!=2)throw new IllegalArgumentException();Float.parseFloat(xy[0]);Float.parseFloat(xy[1]);}rows++;getSharedPreferences("codybot_schema_v3",MODE_PRIVATE).edit().putString("schema_"+current,raw).apply();}}
+            if(rows==0)throw new IllegalArgumentException();status.setText("✅ SCHEMI IMPORTATI\n"+rows+" righe validate.");
+        }catch(Exception ex){new AlertDialog.Builder(this).setTitle("Importazione non valida").setMessage("Il formato non è valido. Usa il testo generato da ESPORTA SCHEMA.").setPositiveButton("OK",null).show();}}
+    private void exportSchemaCalibration(){Map<String,?> all=getSharedPreferences("codybot_schema_v3",MODE_PRIVATE).getAll();StringBuilder out=new StringBuilder();for(Map.Entry<String,?> e:all.entrySet()){if(!e.getKey().startsWith("schema_")||!(e.getValue() instanceof String))continue;String s=(String)e.getValue();if(!s.startsWith("CODYBOT_SCHEMA_V3|"))continue;if(out.length()>0)out.append("\n");out.append(s.trim()).append("\n");}if(out.length()==0){new AlertDialog.Builder(this).setTitle("Esporta schemi").setMessage("Nessuno schema V3 salvato. Esegui prima CALIBRA SCHEMA.").setPositiveButton("OK",null).show();return;}String text=out.toString();new AlertDialog.Builder(this).setTitle("Esporta schemi").setMessage(text).setPositiveButton("COPIA",(d,w)->{ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(ClipData.newPlainText("CodyBot schemi",text));status.setText("✅ SCHEMI COPIATI NEGLI APPUNTI");}).setNegativeButton("CHIUDI",null).show();}
+    private void chooseSchemaLength(String title,String action){final String[] lengths=new String[18];for(int i=0;i<18;i++)lengths[i]=String.valueOf(i+3);new AlertDialog.Builder(this).setTitle(title+" - numero lettere").setItems(lengths,(d,w)->{int len=w+3;Intent i=new Intent("com.codybot."+action);i.setPackage(getPackageName());i.putExtra("length",len);sendBroadcast(i);status.setText(title+" avviata\n\nSchema da "+len+" lettere.");}).show();}
+    private void exportCalibration(){String raw=getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getString("centers",null);if(raw==null||raw.trim().isEmpty()){new AlertDialog.Builder(this).setTitle("Esporta calibrazione").setMessage("Nessuna calibrazione salvata. Esegui prima CALIBRA TASTIERA.").setPositiveButton("OK",null).show();return;}String[] parts=raw.split(",");if(parts.length!=52){new AlertDialog.Builder(this).setTitle("Esporta calibrazione").setMessage("La calibrazione salvata non è valida.").setPositiveButton("OK",null).show();return;}StringBuilder sb=new StringBuilder("CodyBot - Calibrazione tastiera\n");sb.append("Schermo: ").append(getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getInt("width",0)).append(" x ").append(getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getInt("height",0)).append("\n\n");String letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ";for(int i=0;i<26;i++)sb.append(letters.charAt(i)).append(" = ").append(Math.round(Float.parseFloat(parts[i*2]))).append(", ").append(Math.round(Float.parseFloat(parts[i*2+1]))).append("\n");String text=sb.toString();new AlertDialog.Builder(this).setTitle("Calibrazione salvata").setMessage(text).setPositiveButton("COPIA",(d,w)->{ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(ClipData.newPlainText("CodyBot calibrazione",text));status.setText("✅ COORDINATE COPIATE NEGLI APPUNTI");}).setNegativeButton("CHIUDI",null).show();}
+    private void openOverlaySettings(){try{if(!Settings.canDrawOverlays(this))startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}}
+    private boolean isAccessibilityEnabled(){String enabled=Settings.Secure.getString(getContentResolver(),Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);if(enabled==null)return false;String expected=new ComponentName(this,CodyAccessibilityService.class).flattenToString();return enabled.contains(expected);}
+    private void refreshStatus(){boolean overlay=Settings.canDrawOverlays(this);boolean accessibility=isAccessibilityEnabled();status.setText("Sovrapposizione: "+(overlay?"ATTIVA ✓":"NON ATTIVA ✗")+"\nAccessibilità: "+(accessibility?"ATTIVA ✓":"NON ATTIVA ✗")+"\n\nPer vedere CodyBot sopra CodyCross devono essere attive ENTRAMBE.");}
+    @Override protected void onResume(){super.onResume();if(status!=null)refreshStatus();}
 }
