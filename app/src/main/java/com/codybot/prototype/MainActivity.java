@@ -174,7 +174,7 @@ public class MainActivity extends Activity {
     }
 
     private void showAdvanceMenu(){
-        final String[] options={"📍 RILEVA COORDINATE","✏️ MODIFICA COORDINATE","🧪 TEST PUNTO"};
+        final String[] options={"📍 RILEVA COORDINATE","✏️ MODIFICA COORDINATE","🧪 TEST COORDINATE"};
         new AlertDialog.Builder(this).setTitle("RILEVAMENTO COORDINATE").setItems(options,(d,w)->{
             if(w==0){
                 Intent i=new Intent("com.codybot.DETECT_ADVANCE_COORDINATES");i.setPackage(getPackageName());sendBroadcast(i);
