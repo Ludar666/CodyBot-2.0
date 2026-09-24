@@ -131,7 +131,7 @@ public class MainActivity extends Activity {
         b.setBackground(box.getBackground());
         b.setOnClickListener(listener);
         b.setAllCaps(false);
-        b.setMinHeight(78);
+        b.setMinHeight(108);
         b.setPadding(18,0,18,0);
         b.setContentDescription(box.getChildAt(0) instanceof TextView ? ((TextView)box.getChildAt(0)).getText().toString() : "CodyBot");
         // Il testo descrittivo viene mostrato in una seconda riga tramite spannable.
@@ -143,14 +143,14 @@ public class MainActivity extends Activity {
             b.setTextSize(15);
             b.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.LEFT);
         }
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,82);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,112);
         lp.setMargins(0,0,0,12);
         b.setLayoutParams(lp);
         return b;
     }
 
     private void showKeyboardMenu(){
-        final String[] options={"🔧 CALIBRA","🧪 TEST","📥 IMPORTA","📤 ESPORTA"};
+        final String[] options={"🔧 CALIBRA","🧪 TEST","📥 IMPORTA","📤 ESPORTA","📍 VEDI COORDINATE"};
         new AlertDialog.Builder(this).setTitle("CALIBRAZIONE TASTIERA").setItems(options,(d,w)->{
             if(w==0){
                 Intent i=new Intent("com.codybot.CALIBRATE_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);
@@ -159,17 +159,19 @@ public class MainActivity extends Activity {
                 Intent i=new Intent("com.codybot.ARM_TEST_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);
                 status.setText("🧪 TEST TASTIERA PRONTO\\n\\nPassa ora a CodyCross.\\nIl test A-Z partirà automaticamente quando CodyCross diventa l'app in primo piano.");
             } else if(w==2) importKeyboardCalibration();
-            else exportCalibration();
+            else if(w==3) exportCalibration();
+            else showKeyboardCoordinates();
         }).show();
     }
 
     private void showSchemaMenu(){
-        final String[] options={"📐 CALIBRA","🧪 TEST","📥 IMPORTA","📤 ESPORTA"};
+        final String[] options={"📐 CALIBRA","🧪 TEST","📥 IMPORTA","📤 ESPORTA","📍 VEDI COORDINATE"};
         new AlertDialog.Builder(this).setTitle("CALIBRAZIONE SCHEMI").setItems(options,(d,w)->{
             if(w==0) chooseMultiRowSchemaLength();
             else if(w==1) chooseSchemaLength("TEST SCHEMA","TEST_SCHEMA");
             else if(w==2) importSchemaCalibration();
-            else exportSchemaCalibration();
+            else if(w==3) exportSchemaCalibration();
+            else showSchemaCoordinates();
         }).show();
     }
 
@@ -208,8 +210,8 @@ public class MainActivity extends Activity {
 
     private void editAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);EditText ex=new EditText(this);ex.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ex.setHint("X");ex.setText(String.valueOf(Math.round(p.getFloat("x",1016f))));EditText ey=new EditText(this);ey.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ey.setHint("Y");ey.setText(String.valueOf(Math.round(p.getFloat("y",1559f))));LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(30,0,30,0);box.addView(ex);box.addView(ey);new AlertDialog.Builder(this).setTitle("Coordinata avanzamento riga").setMessage("Valori predefiniti: X 1016, Y 1559").setView(box).setPositiveButton("SALVA",(d,w)->{try{float x=Float.parseFloat(ex.getText().toString()),y=Float.parseFloat(ey.getText().toString());if(x<0||y<0)throw new Exception();p.edit().putFloat("x",x).putFloat("y",y).apply();status.setText("✅ COORDINATE SALVATE\nX = "+Math.round(x)+"\nY = "+Math.round(y));}catch(Exception e){status.setText("❌ Coordinate non valide");}}).setNegativeButton("ANNULLA",null).show();}
     private void chooseMultiRowSchemaLength(){final String[] lengths=new String[18];for(int i=0;i<18;i++)lengths[i]=String.valueOf(i+3);new AlertDialog.Builder(this).setTitle("CALIBRAZIONE SCHEMA").setSingleChoiceItems(lengths,-1,(d,w)->{int len=w+3;d.dismiss();Intent i=new Intent(this,SchemaCalibrationService.class);i.setAction(SchemaCalibrationService.ACTION_START);i.putExtra(SchemaCalibrationService.EXTRA_LENGTH,len);startService(i);status.setText("📐 CALIBRAZIONE SCHEMA AVVIATA\n\n"+len+" lettere per parola.\nIl numero di parole è variabile.");}).show();}
-    private void importKeyboardCalibration(){ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cb==null||!cb.hasPrimaryClip()){new AlertDialog.Builder(this).setTitle("Importa calibrazione").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK",null).show();return;}String raw=cb.getPrimaryClip().getItemAt(0).coerceToText(this).toString();EditText e=new EditText(this);e.setText(raw);e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(12);new AlertDialog.Builder(this).setTitle("Importa calibrazione tastiera").setMessage("Puoi modificare liberamente le coordinate prima di salvarle.").setView(e).setPositiveButton("SALVA",(d,w)->{Intent i=new Intent("com.codybot.IMPORT_KEYBOARD");i.setPackage(getPackageName());i.putExtra("data",e.getText().toString());sendBroadcast(i);}).setNegativeButton("ANNULLA",null).show();}
-    private void importSchemaCalibration(){ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cb==null||!cb.hasPrimaryClip()){new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Copia prima negli appunti il testo esportato.").setPositiveButton("OK",null).show();return;}String raw=cb.getPrimaryClip().getItemAt(0).coerceToText(this).toString();EditText e=new EditText(this);e.setText(raw);e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(14);new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Formato CODYBOT_SCHEMA_V3. Puoi modificare le coordinate prima di salvarle.").setView(e).setPositiveButton("SALVA",(d,w)->saveImportedSchemaV3(e.getText().toString())).setNegativeButton("ANNULLA",null).show();}
+    private void importKeyboardCalibration(){EditText e=new EditText(this);e.setText("");e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setHint("Incolla qui la calibrazione tastiera...");e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(14);new AlertDialog.Builder(this).setTitle("Importa calibrazione tastiera").setMessage("Incolla manualmente il testo esportato. Il campo parte vuoto e viene salvato solo premendo SALVA.").setView(e).setPositiveButton("SALVA",(d,w)->{Intent i=new Intent("com.codybot.IMPORT_KEYBOARD");i.setPackage(getPackageName());i.putExtra("data",e.getText().toString());sendBroadcast(i);status.setText("📥 IMPORTAZIONE TASTIERA IN CORSO...");}).setNegativeButton("ANNULLA",null).show();}
+    private void importSchemaCalibration(){EditText e=new EditText(this);e.setText("");e.setTextSize(14);e.setGravity(android.view.Gravity.TOP);e.setHint("Incolla qui lo schema CODYBOT_SCHEMA_V3...");e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);e.setMinLines(16);new AlertDialog.Builder(this).setTitle("Importa schemi").setMessage("Incolla manualmente il testo esportato. Il campo parte vuoto e viene salvato solo premendo SALVA.").setView(e).setPositiveButton("SALVA",(d,w)->saveImportedSchemaV3(e.getText().toString())).setNegativeButton("ANNULLA",null).show();}
     private void saveImportedSchemaV3(String raw){
         try{
             String[] lines=raw.split("\\r?\\n");
@@ -318,6 +320,10 @@ public class MainActivity extends Activity {
 
     private void exportSchemaCalibration(){Map<String,?> all=getSharedPreferences("codybot_schema_v3",MODE_PRIVATE).getAll();StringBuilder out=new StringBuilder();for(Map.Entry<String,?> e:all.entrySet()){if(!e.getKey().startsWith("schema_")||!(e.getValue() instanceof String))continue;String s=(String)e.getValue();if(!s.startsWith("CODYBOT_SCHEMA_V3|"))continue;if(out.length()>0)out.append("\n");out.append(s.trim()).append("\n");}if(out.length()==0){new AlertDialog.Builder(this).setTitle("Esporta schemi").setMessage("Nessuno schema V3 salvato. Esegui prima CALIBRA SCHEMA.").setPositiveButton("OK",null).show();return;}String text=out.toString();new AlertDialog.Builder(this).setTitle("Esporta schemi").setMessage(text).setPositiveButton("COPIA",(d,w)->{ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(ClipData.newPlainText("CodyBot schemi",text));status.setText("✅ SCHEMI COPIATI NEGLI APPUNTI");}).setNegativeButton("CHIUDI",null).show();}
     private void chooseSchemaLength(String title,String action){final String[] lengths=new String[18];for(int i=0;i<18;i++)lengths[i]=String.valueOf(i+3);new AlertDialog.Builder(this).setTitle(title+" - numero lettere").setItems(lengths,(d,w)->{int len=w+3;Intent i=new Intent("com.codybot."+action);i.setPackage(getPackageName());i.putExtra("length",len);sendBroadcast(i);status.setText(title+" avviata\n\nSchema da "+len+" lettere.");}).show();}
+    private void showKeyboardCoordinates(){String raw=getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getString("centers",null);if(raw==null||raw.trim().isEmpty()){new AlertDialog.Builder(this).setTitle("Coordinate tastiera").setMessage("Nessuna coordinata tastiera salvata. Esegui prima CALIBRA o IMPORTA.").setPositiveButton("OK",null).show();return;}String[] p=raw.split(",");if(p.length!=52){new AlertDialog.Builder(this).setTitle("Coordinate tastiera").setMessage("Le coordinate salvate non sono valide.").setPositiveButton("OK",null).show();return;}StringBuilder sb=new StringBuilder();String letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ";for(int i=0;i<26;i++)sb.append(letters.charAt(i)).append(" = ").append(Math.round(Float.parseFloat(p[i*2]))).append(", ").append(Math.round(Float.parseFloat(p[i*2+1]))).append("\n");showCoordinateDialog("Coordinate tastiera",sb.toString());}
+    private void showSchemaCoordinates(){Map<String,?> all=getSharedPreferences("codybot_schema_v3",MODE_PRIVATE).getAll();java.util.ArrayList<String> keys=new java.util.ArrayList<>();for(String k:all.keySet())if(k.startsWith("schema_")&&all.get(k) instanceof String)keys.add(k);java.util.Collections.sort(keys,(a,b)->Integer.compare(parseSchemaKey(a),parseSchemaKey(b)));if(keys.isEmpty()){new AlertDialog.Builder(this).setTitle("Coordinate schemi").setMessage("Nessuno schema V3 salvato. Esegui prima CALIBRA o IMPORTA.").setPositiveButton("OK",null).show();return;}StringBuilder sb=new StringBuilder();for(String k:keys){String v=(String)all.get(k);sb.append(v.trim()).append("\n\n");}showCoordinateDialog("Coordinate schemi",sb.toString());}
+    private int parseSchemaKey(String k){try{return Integer.parseInt(k.substring("schema_".length()));}catch(Exception e){return Integer.MAX_VALUE;}}
+    private void showCoordinateDialog(String title,String text){TextView tv=new TextView(this);tv.setText(text);tv.setTextColor(android.graphics.Color.WHITE);tv.setTextSize(14);tv.setTypeface(android.graphics.Typeface.MONOSPACE);tv.setPadding(24,18,24,18);ScrollView sv=new ScrollView(this);sv.setBackgroundColor(android.graphics.Color.rgb(24,29,36));sv.addView(tv,new ScrollView.LayoutParams(-1,-2));new AlertDialog.Builder(this).setTitle(title).setView(sv).setPositiveButton("CHIUDI",null).show();}
     private void exportCalibration(){String raw=getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getString("centers",null);if(raw==null||raw.trim().isEmpty()){new AlertDialog.Builder(this).setTitle("Esporta calibrazione").setMessage("Nessuna calibrazione salvata. Esegui prima CALIBRA TASTIERA.").setPositiveButton("OK",null).show();return;}String[] parts=raw.split(",");if(parts.length!=52){new AlertDialog.Builder(this).setTitle("Esporta calibrazione").setMessage("La calibrazione salvata non è valida.").setPositiveButton("OK",null).show();return;}StringBuilder sb=new StringBuilder("CodyBot - Calibrazione tastiera\n");sb.append("Schermo: ").append(getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getInt("width",0)).append(" x ").append(getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getInt("height",0)).append("\n\n");String letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ";for(int i=0;i<26;i++)sb.append(letters.charAt(i)).append(" = ").append(Math.round(Float.parseFloat(parts[i*2]))).append(", ").append(Math.round(Float.parseFloat(parts[i*2+1]))).append("\n");String text=sb.toString();new AlertDialog.Builder(this).setTitle("Calibrazione salvata").setMessage(text).setPositiveButton("COPIA",(d,w)->{ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(ClipData.newPlainText("CodyBot calibrazione",text));status.setText("✅ COORDINATE COPIATE NEGLI APPUNTI");}).setNegativeButton("CHIUDI",null).show();}
     private void openOverlaySettings(){try{if(!Settings.canDrawOverlays(this))startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}}
     private boolean isAccessibilityEnabled(){String enabled=Settings.Secure.getString(getContentResolver(),Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);if(enabled==null)return false;String expected=new ComponentName(this,CodyAccessibilityService.class).flattenToString();return enabled.contains(expected);}
