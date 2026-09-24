@@ -91,55 +91,84 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
 
  private void loadAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);advanceX=p.getFloat("x",DEFAULT_ADVANCE_X);advanceY=p.getFloat("y",DEFAULT_ADVANCE_Y);}
  private void saveAdvancePoint(float x,float y){advanceX=x;advanceY=y;getSharedPreferences("codybot_advance",MODE_PRIVATE).edit().putFloat("x",x).putFloat("y",y).apply();}
- private void testAdvancePoint(){loadAdvancePoint();updateOverlayText("🧪 TEST COORDINATE\nPremo "+Math.round(advanceX)+", "+Math.round(advanceY)+"...");handler.postDelayed(()->tap(advanceX,advanceY),250);}
- private void startAdvanceCoordinateDetection(){
+ private void testAdvancePoint(){
   stopCompilation();
-  if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}
+  loadAdvancePoint();
   if(coordinateView!=null)removeCoordinateView();
-
   LinearLayout p=new LinearLayout(this);
   p.setOrientation(LinearLayout.VERTICAL);
   p.setGravity(Gravity.CENTER_HORIZONTAL);
   p.setPadding(28,24,28,24);
   p.setBackgroundColor(Color.parseColor("#EE111111"));
-
   TextView t=new TextView(this);
-  t.setText("📍 RILEVA COORDINATE");
-  t.setTextColor(Color.WHITE);
-  t.setTextSize(20);
-  t.setGravity(Gravity.CENTER);
+  t.setText("🧪 TEST COORDINATE");
+  t.setTextColor(Color.WHITE); t.setTextSize(20); t.setGravity(Gravity.CENTER);
   p.addView(t,new LinearLayout.LayoutParams(-1,-2));
-
   TextView m=new TextView(this);
-  m.setText("1. Premi AVVIA RILEVAMENTO.\\n\\n2. CodyBot si metterà in attesa e ti lascerà passare a CodyCross.\\n\\n3. Porta CodyCross sulla schermata dello schema.\\n\\n4. Quando CodyCross è in primo piano, comparirà la schermata per toccare il centro di «PASSA ALLA RIGA SUCCESSIVA».");
-  m.setTextColor(Color.WHITE);
-  m.setTextSize(16);
-  m.setPadding(0,20,0,20);
+  m.setText("1. Apri CodyCross e porta il gioco sulla schermata da testare.\\n\\n2. Quando sei pronto, premi AVVIA TEST qui sotto.\\n\\n3. CodyBot eseguirà un solo tap sulle coordinate salvate.\\n\\nCoordinate salvate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
+  m.setTextColor(Color.WHITE); m.setTextSize(16); m.setPadding(0,20,0,20);
   p.addView(m,new LinearLayout.LayoutParams(-1,-2));
-
-  LinearLayout r=new LinearLayout(this);
-  r.setGravity(Gravity.CENTER);
-  Button c=new Button(this);
-  c.setText("ANNULLA");
-  c.setOnClickListener(v->{advanceDetectionArmed=false;removeCoordinateView();});
-  Button s=new Button(this);
-  s.setText("AVVIA RILEVAMENTO");
-  s.setOnClickListener(v->{
-    removeCoordinateView();
-    advanceDetectionArmed=true;
-    overlayHidden=true;
-    if(overlayView!=null&&windowManager!=null)windowManager.removeView(overlayView); overlayView=null; statusText=null;
-    updateOverlayText("📍 RILEVAMENTO PRONTO\\n\\nOra passa a CodyCross.\\nLa schermata di rilevamento apparirà automaticamente.");
+  LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER);
+  Button cancel=new Button(this); cancel.setText("ANNULLA");
+  cancel.setOnClickListener(v->removeCoordinateView());
+  Button start=new Button(this); start.setText("AVVIA TEST");
+  start.setOnClickListener(v->{
+   removeCoordinateView();
+   overlayHidden=true;
+   if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}
+   overlayView=null; statusText=null;
+   updateOverlayText("🧪 TEST COORDINATE IN CORSO\\nTap su X = "+Math.round(advanceX)+"  Y = "+Math.round(advanceY));
+   handler.postDelayed(()->{
+    tap(advanceX,advanceY);
+    handler.postDelayed(()->{
+     overlayHidden=false;
+     updateOverlayText("✅ TEST COORDINATE ESEGUITO\\nX = "+Math.round(advanceX)+"\\nY = "+Math.round(advanceY));
+     handler.postDelayed(overlayChecker,250);
+    },250);
+   },250);
   });
-  r.addView(c);
-  r.addView(s);
-  p.addView(r);
-
+  r.addView(cancel); r.addView(start); p.addView(r);
   coordinateView=p;
   DisplayMetrics dm=getResources().getDisplayMetrics();
   WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(dm.widthPixels*.92f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
-  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;
-  q.y=120;
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=120;
+  try{windowManager.addView(coordinateView,q);}catch(Exception e){coordinateView=null;updateOverlayText("❌ Errore test: "+e.getClass().getSimpleName());}
+ }
+ private void startAdvanceCoordinateDetection(){
+  stopCompilation();
+  if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}
+  if(coordinateView!=null)removeCoordinateView();
+  LinearLayout p=new LinearLayout(this);
+  p.setOrientation(LinearLayout.VERTICAL);
+  p.setGravity(Gravity.CENTER_HORIZONTAL);
+  p.setPadding(28,24,28,24);
+  p.setBackgroundColor(Color.parseColor("#EE111111"));
+  TextView t=new TextView(this);
+  t.setText("📍 RILEVA COORDINATE");
+  t.setTextColor(Color.WHITE); t.setTextSize(20); t.setGravity(Gravity.CENTER);
+  p.addView(t,new LinearLayout.LayoutParams(-1,-2));
+  TextView m=new TextView(this);
+  m.setText("1. Apri CodyCross e porta il gioco sulla schermata dello schema.\\n\\n2. Quando sei pronto, premi AVVIA ACQUISIZIONE.\\n\\n3. CodyBot ti chiederà di toccare il centro di «PASSA ALLA RIGA SUCCESSIVA».\\n\\n4. Tocca esattamente il centro del pulsante.\\n\\nLa coordinata verrà salvata e mostrata nel banner CodyBot.");
+  m.setTextColor(Color.WHITE); m.setTextSize(16); m.setPadding(0,20,0,20);
+  p.addView(m,new LinearLayout.LayoutParams(-1,-2));
+  LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER);
+  Button cancel=new Button(this); cancel.setText("ANNULLA");
+  cancel.setOnClickListener(v->{advanceDetectionArmed=false;removeCoordinateView();});
+  Button startButton=new Button(this); startButton.setText("AVVIA ACQUISIZIONE");
+  startButton.setOnClickListener(v->{
+   removeCoordinateView();
+   advanceDetectionArmed=false;
+   overlayHidden=true;
+   if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}
+   overlayView=null; statusText=null;
+   updateOverlayText("📍 ACQUISIZIONE PRONTA\\nTocca il centro di «PASSA ALLA RIGA SUCCESSIVA»");
+   handler.postDelayed(this::showAdvanceCoordinateCapture,300);
+  });
+  r.addView(cancel); r.addView(startButton); p.addView(r);
+  coordinateView=p;
+  DisplayMetrics dm=getResources().getDisplayMetrics();
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(dm.widthPixels*.92f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=120;
   try{windowManager.addView(coordinateView,q);}catch(Exception e){coordinateView=null;updateOverlayText("❌ Errore rilevazione: "+e.getClass().getSimpleName());}
  }
  private void showAdvanceCoordinateCapture(){
