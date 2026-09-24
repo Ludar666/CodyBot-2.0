@@ -47,7 +47,7 @@ public class CodyAccessibilityService extends AccessibilityService {
  private View coordinateView;
  private final Runnable overlayChecker=new Runnable(){public void run(){if(overlayHidden)return;if(overlayView==null){if(Settings.canDrawOverlays(CodyAccessibilityService.this))showOverlay();else handler.postDelayed(this,1000);}}};
  private final BroadcastReceiver overlayReceiver=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(i==null)return;if(i.hasExtra("message")&&statusText!=null)statusText.setText(i.getStringExtra("message"));String a=i.getAction();if("com.codybot.FILL_ANSWER".equals(a)){String s=i.getStringExtra("answer");if(s!=null&&!s.trim().isEmpty()&&ScreenCaptureService.isServiceRunning())fillAnswer(s);}else if("com.codybot.STOP_COMPILATION".equals(a))stopCompilation();else if("com.codybot.ARM_TEST_KEYBOARD".equals(a)){armKeyboardTest();}
-else if("com.codybot.TEST_KEYBOARD".equals(a)){runKeyboardTest();}else if("com.codybot.CALIBRATE_KEYBOARD".equals(a))startManualKeyboardCalibration();else if("com.codybot.CALIBRATE_SCHEMA".equals(a)){int n=i.getIntExtra("length",0);if(n>0)startSchemaCalibration(n);}else if("com.codybot.TEST_SCHEMA".equals(a)){int n=i.getIntExtra("length",0);if(n>0)testSchemaCalibration(n);}else if("com.codybot.EXPORT_SCHEMA".equals(a))exportSchemaCalibration();else if("com.codybot.IMPORT_KEYBOARD".equals(a))importKeyboardCalibration(i.getStringExtra("data"));else if("com.codybot.IMPORT_SCHEMA".equals(a))importSchemaCalibration(i.getStringExtra("data"));else if("com.codybot.HIDE_OVERLAY".equals(a))hideOverlay();else if("com.codybot.ADVANCE_SCHEMA_ROW".equals(a)){float x=i.hasExtra("x")?i.getFloatExtra("x",advanceX):advanceX;float y=i.hasExtra("y")?i.getFloatExtra("y",advanceY):advanceY;tap(x,y);updateOverlayText("📍 TAP AVANZAMENTO: "+Math.round(x)+", "+Math.round(y));}else if("com.codybot.TEST_ADVANCE_POINT".equals(a)){testAdvancePoint();}else if("com.codybot.DETECT_ADVANCE_COORDINATES".equals(a)){startAdvanceCoordinateDetection();}}};
+else if("com.codybot.TEST_KEYBOARD".equals(a)){runKeyboardTest();}else if("com.codybot.CALIBRATE_KEYBOARD".equals(a))startManualKeyboardCalibration();else if("com.codybot.CALIBRATE_SCHEMA".equals(a)){int n=i.getIntExtra("length",0);if(n>0)startSchemaCalibration(n);}else if("com.codybot.TEST_SCHEMA".equals(a)){int n=i.getIntExtra("length",0);if(n>0)testSchemaCalibration(n);}else if("com.codybot.EXPORT_SCHEMA".equals(a))exportSchemaCalibration();else if("com.codybot.IMPORT_KEYBOARD".equals(a))importKeyboardCalibration(i.getStringExtra("data"));else if("com.codybot.IMPORT_SCHEMA".equals(a))importSchemaCalibration(i.getStringExtra("data"));else if("com.codybot.HIDE_OVERLAY".equals(a))hideOverlay();else if("com.codybot.ADVANCE_SCHEMA_ROW".equals(a)){float x=i.hasExtra("x")?i.getFloatExtra("x",advanceX):advanceX;float y=i.hasExtra("y")?i.getFloatExtra("y",advanceY):advanceY;tap(x,y);updateOverlayText("📍 TAP COORDINATE: "+Math.round(x)+", "+Math.round(y));}else if("com.codybot.TEST_ADVANCE_POINT".equals(a)){testAdvancePoint();}else if("com.codybot.DETECT_ADVANCE_COORDINATES".equals(a)){startAdvanceCoordinateDetection();}}};
  @Override public void onAccessibilityEvent(AccessibilityEvent e){if(e!=null&&e.getPackageName()!=null){String n=e.getPackageName().toString();if(!n.equals(getPackageName())&&!n.equals("android")&&!n.equals("com.android.systemui")){
  lastTargetPackage=n;
  if(keyboardTestArmed){
@@ -90,7 +90,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
 
  private void loadAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);advanceX=p.getFloat("x",DEFAULT_ADVANCE_X);advanceY=p.getFloat("y",DEFAULT_ADVANCE_Y);}
  private void saveAdvancePoint(float x,float y){advanceX=x;advanceY=y;getSharedPreferences("codybot_advance",MODE_PRIVATE).edit().putFloat("x",x).putFloat("y",y).apply();}
- private void testAdvancePoint(){loadAdvancePoint();updateOverlayText("🧪 TEST PUNTO\nPremo "+Math.round(advanceX)+", "+Math.round(advanceY)+"...");handler.postDelayed(()->tap(advanceX,advanceY),250);}
+ private void testAdvancePoint(){loadAdvancePoint();updateOverlayText("🧪 TEST COORDINATE\nPremo "+Math.round(advanceX)+", "+Math.round(advanceY)+"...");handler.postDelayed(()->tap(advanceX,advanceY),250);}
  private void startAdvanceCoordinateDetection(){
   stopCompilation();
   if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}
@@ -103,7 +103,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
   p.setBackgroundColor(Color.parseColor("#EE111111"));
 
   TextView t=new TextView(this);
-  t.setText("📍 RILEVA COORDINATE AVANZAMENTO");
+  t.setText("📍 RILEVA COORDINATE");
   t.setTextColor(Color.WHITE);
   t.setTextSize(20);
   t.setGravity(Gravity.CENTER);
