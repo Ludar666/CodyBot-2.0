@@ -128,7 +128,7 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
     removeCoordinateView();
     advanceDetectionArmed=true;
     overlayHidden=true;
-    if(overlayView!=null)removeOverlay();
+    if(overlayView!=null&&windowManager!=null)windowManager.removeView(overlayView); overlayView=null; statusText=null;
     updateOverlayText("📍 RILEVAMENTO PRONTO\\n\\nOra passa a CodyCross.\\nLa schermata di rilevamento apparirà automaticamente.");
   });
   r.addView(c);
