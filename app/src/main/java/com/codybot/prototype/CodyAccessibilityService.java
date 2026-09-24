@@ -56,7 +56,7 @@ else if("com.codybot.TEST_KEYBOARD".equals(a)){runKeyboardTest();}else if("com.c
  }
  if(advanceDetectionArmed){
   advanceDetectionArmed=false;
-  handler.postDelayed(this::startAdvanceCoordinateDetection,500);
+  handler.postDelayed(this::showAdvanceCoordinateCapture,500);
  }
 }}if(!overlayHidden&&overlayView==null&&Settings.canDrawOverlays(this))handler.post(overlayChecker);}
  public static String getLastTargetPackage(){return lastTargetPackage;}
@@ -140,6 +140,43 @@ registerReceiver(overlayReceiver,new IntentFilter("com.codybot.ARM_TEST_KEYBOARD
   q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;
   q.y=120;
   try{windowManager.addView(coordinateView,q);}catch(Exception e){coordinateView=null;updateOverlayText("❌ Errore rilevazione: "+e.getClass().getSimpleName());}
+ }
+ private void showAdvanceCoordinateCapture(){
+  if(!Settings.canDrawOverlays(this)){updateOverlayText("⚠️ Attiva prima la sovrapposizione");return;}
+  DisplayMetrics dm=getResources().getDisplayMetrics();
+  FrameLayout f=new FrameLayout(this);
+  f.setBackgroundColor(Color.TRANSPARENT);
+  f.setClickable(true);
+  TextView info=new TextView(this);
+  info.setText("📍 RILEVA COORDINATE\\n\\nTocca il centro del pulsante «PASSA ALLA RIGA SUCCESSIVA»");
+  info.setTextColor(Color.WHITE);
+  info.setTextSize(17);
+  info.setGravity(Gravity.CENTER);
+  info.setBackgroundColor(Color.parseColor("#DD000000"));
+  FrameLayout.LayoutParams ip=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);
+  ip.topMargin=50;
+  f.addView(info,ip);
+  Button cancel=new Button(this);
+  cancel.setText("ANNULLA");
+  cancel.setOnClickListener(v->{advanceDetectionArmed=false;removeCoordinateView();overlayHidden=false;handler.postDelayed(overlayChecker,250);});
+  FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
+  cp.bottomMargin=80;
+  f.addView(cancel,cp);
+  f.setOnTouchListener((v,e)->{
+    if(e==null||e.getAction()!=android.view.MotionEvent.ACTION_UP)return true;
+    if(e.getY()<220)return true;
+    float x=e.getX(),y=e.getY();
+    saveAdvancePoint(x,y);
+    removeCoordinateView();
+    overlayHidden=false;
+    updateOverlayText("✅ COORDINATA SALVATA\\nX = "+Math.round(x)+"\\nY = "+Math.round(y));
+    handler.postDelayed(overlayChecker,250);
+    return true;
+  });
+  coordinateView=f;
+  WindowManager.LayoutParams lp=new WindowManager.LayoutParams(dm.widthPixels,dm.heightPixels,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
+  lp.gravity=Gravity.TOP|Gravity.START;
+  try{windowManager.addView(coordinateView,lp);}catch(Exception e){coordinateView=null;updateOverlayText("❌ Errore rilevazione: "+e.getClass().getSimpleName());}
  }
  private void removeCoordinateView(){if(coordinateView!=null&&windowManager!=null)try{windowManager.removeView(coordinateView);}catch(Exception ignored){}coordinateView=null;}
  private void saveManualCalibration(float[] c,int w,int h){StringBuilder s=new StringBuilder();for(int i=0;i<c.length;i++){if(i>0)s.append(',');s.append(c[i]);}getSharedPreferences("codybot_keyboard",MODE_PRIVATE).edit().putString("centers",s.toString()).putInt("width",w).putInt("height",h).apply();}
