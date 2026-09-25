@@ -126,7 +126,7 @@ public class SchemaCalibrationService extends Service {
     private void removeMainOverlay(){if(overlay!=null){try{wm.removeView(overlay);}catch(Exception ignored){}overlay=null;}}
     private void removeContinueOverlay(){if(continueOverlay!=null){try{wm.removeView(continueOverlay);}catch(Exception ignored){}continueOverlay=null;}}
     private void removeAllOverlays(){removeMainOverlay();removeContinueOverlay();}
-    private void stopCalibration(){acquiring=false;paused=false;removeAllOverlays();}
+    private void stopCalibration(){acquiring=false;paused=false;removeAllOverlays();Intent i=new Intent("com.codybot.RESTORE_SCAN_OVERLAY");i.setPackage(getPackageName());sendBroadcast(i);}
     @Override public void onDestroy(){stopCalibration();super.onDestroy();}
     @Override public IBinder onBind(Intent intent){return null;}
 }
