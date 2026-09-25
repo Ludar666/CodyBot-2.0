@@ -433,7 +433,7 @@ private void loadManualCalibration(){
   // translation in the current screenshot and apply it to every cell.
   final int[] centers=shiftSchemaCentersVertically(source,baseCenters);
   final int spacing=schemaSpacing(centers);
-  final int half=Math.max(22,Math.min(70,(int)(spacing*.42f)));
+  final int half=Math.max(18,Math.min(45,(int)(spacing*.28f)));
   final java.util.Set<Integer> found=new java.util.HashSet<Integer>();
 
   updateOverlayText("🟢 COMPILAZIONE\nRISPOSTA: "+clean+"\nSchema trovato - controllo lettere...");
@@ -538,13 +538,23 @@ private void loadManualCalibration(){
   recognizer.process(image).addOnSuccessListener(result->{
     boolean letter=false;
     char expected=clean.charAt(index);
-    for(Text.TextBlock block:result.getTextBlocks())
-      for(Text.Line line:block.getLines())
+    final int cw=cell.getWidth(),ch=cell.getHeight();
+    for(Text.TextBlock block:result.getTextBlocks()){
+      for(Text.Line line:block.getLines()){
         for(Text.Element el:line.getElements()){
-          String t=el.getText()==null?"":el.getText().toUpperCase().replaceAll("[^A-Z]","");
-          // Only accept OCR that contains the letter expected at this position.
-          if(t.indexOf(expected)>=0){letter=true;break;}
+          String raw=el.getText()==null?"":el.getText().trim().toUpperCase();
+          String t=raw.replaceAll("[^A-Z]","");
+          android.graphics.Rect box=el.getBoundingBox();
+          if(t.length()!=1||t.charAt(0)!=expected||box==null)continue;
+          float bx=box.centerX(), by=box.centerY();
+          float dx=Math.abs(bx-cw*.5f)/(float)Math.max(1,cw);
+          float dy=Math.abs(by-ch*.5f)/(float)Math.max(1,ch);
+          if(dx<=.30f&&dy<=.30f){letter=true;break;}
         }
+        if(letter)break;
+      }
+      if(letter)break;
+    }
     if(letter)found.add(index);
     try{cell.recycle();}catch(Exception ignored){}
     processSchemaCell(b,clean,centers,index+1,half,found,done);
