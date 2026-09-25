@@ -40,8 +40,8 @@ public class CodyAccessibilityService extends AccessibilityService {
  private WindowManager windowManager; private View overlayView; private volatile boolean overlayHidden=false; private TextView statusText; private View calibrationView; private final Handler handler=new Handler(Looper.getMainLooper());
  private final List<Runnable> pendingCompilation=new ArrayList<>(); private boolean compiling=false; private static volatile String lastTargetPackage=""; private volatile boolean calibrationInProgress=false; private final String calibrationLetters="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; private int calibrationIndex=0; private float[] manualCalibrationCenters; private volatile float[] calibratedCenters; private TextRecognizer recognizer; private volatile boolean schemaCapturePending=false; private volatile String currentSchemaAnswer="";
  private volatile boolean keyboardTestArmed=false;
- private static final float DEFAULT_ADVANCE_X=1016f;
- private static final float DEFAULT_ADVANCE_Y=1559f;
+ private static final float DEFAULT_ADVANCE_X=997f;
+ private static final float DEFAULT_ADVANCE_Y=1542f;
  private float advanceX=DEFAULT_ADVANCE_X, advanceY=DEFAULT_ADVANCE_Y;
  private boolean advanceDetectionArmed=false;
  private boolean advanceTestArmed=false;
