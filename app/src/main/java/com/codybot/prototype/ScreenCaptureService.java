@@ -53,8 +53,12 @@ public class ScreenCaptureService extends Service {
         if(ACTION_START_SCAN.equals(a)){
             if (running) {
                 updateStatus();
-            } else if (projection != null && reader != null && display != null) {
-                startScanning();
+            } else if (projection != null) {
+                // Dopo STOP il servizio mantiene la MediaProjection, ma il
+                // vecchio ImageReader/VirtualDisplay può non riprendere
+                // correttamente la consegna dei frame. Ricreiamo quindi solo
+                // la pipeline di cattura, senza chiedere di nuovo il permesso.
+                restartScanning();
                 updateStatus();
             } else {
                 requestProjection();
@@ -121,6 +125,23 @@ public class ScreenCaptureService extends Service {
             broadcast("ERRORE AVVIO: "+e.getMessage(),"");
             stopCapture();
         }
+    }
+
+    private void restartScanning(){
+        try{
+            if(display!=null){
+                display.release();
+                display=null;
+            }
+            if(reader!=null){
+                try{reader.close();}catch(Exception ignored){}
+                reader=null;
+            }
+        }catch(Exception ignored){}
+        running=false;
+        lastScan=0;
+        lastClue="";
+        startScanning();
     }
 
     private void startScanning(){
