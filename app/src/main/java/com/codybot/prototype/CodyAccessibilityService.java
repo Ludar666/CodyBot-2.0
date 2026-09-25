@@ -77,6 +77,7 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
   }catch(Exception e){updateOverlayText("❌ Importazione tastiera non valida\\nServono le 26 righe A = x, y ... Z = x, y.");}
  }
  private void importSchemaCalibration(String raw){
+  if(raw!=null&&raw.trim().startsWith("CODYBOT_SCHEMA_V3|")){try{String[] lines=raw.trim().split("\\r?\\n");int cols=Integer.parseInt(lines[0].substring(lines[0].indexOf("|")+1).trim());for(String line:lines){String t=line.trim();if(t.startsWith("ROW|1|")){String[] cells=t.split("\\|",3)[2].split(";");if(cells.length!=cols)throw new IllegalArgumentException();StringBuilder out=new StringBuilder();for(String cell:cells){String[] xy=cell.trim().split(",");if(xy.length!=2)throw new IllegalArgumentException();if(out.length()>0)out.append(",");out.append(Integer.parseInt(xy[0].trim())).append(",").append(Integer.parseInt(xy[1].trim()));}getSharedPreferences("codybot_schema",MODE_PRIVATE).edit().putString("centers_"+cols,out.toString()).apply();updateOverlayText("✅ SCHEMA V3 IMPORTATO");return;}}throw new IllegalArgumentException();}catch(Exception e){updateOverlayText("❌ Importazione schema V3 non valida");return;}}
   if(raw==null||raw.trim().isEmpty()){updateOverlayText("❌ Importazione schemi: dati vuoti");return;}
   try{
     String[] lines=raw.split("\\r?\\n");int len=0;int[] centers=null;int count=0;
