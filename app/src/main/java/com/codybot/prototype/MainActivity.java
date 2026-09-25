@@ -158,10 +158,10 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("CALIBRAZIONE TASTIERA").setItems(options,(d,w)->{
             if(w==0){
                 Intent i=new Intent("com.codybot.CALIBRATE_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);
-                status.setText("CALIBRAZIONE TASTIERA AVVIATA\\n\\nTocca A-Z sulla tastiera CodyCross.");
+                status.setText("CALIBRAZIONE TASTIERA AVVIATA\n\nTocca A-Z sulla tastiera CodyCross.");
             } else if(w==1){
                 Intent i=new Intent("com.codybot.ARM_TEST_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);
-                status.setText("🧪 TEST TASTIERA PRONTO\\n\\nOra puoi tornare su CodyCross.\\nQuando CodyCross è visibile comparirà AVVIA TEST.");
+                status.setText("🧪 TEST TASTIERA PRONTO\n\nOra puoi tornare su CodyCross.\nQuando CodyCross è visibile comparirà AVVIA TEST.");
             } else if(w==2) importKeyboardCalibration();
             else if(w==3) exportCalibration();
             else showKeyboardCoordinates();
@@ -230,7 +230,7 @@ public class MainActivity extends Activity {
  e.setText("");
  e.setTextSize(14);
  e.setGravity(android.view.Gravity.TOP);
- e.setHint("A = X, Y\\nB = X, Y\\n...\\nZ = X, Y");
+ e.setHint("A = X, Y\nB = X, Y\n...\nZ = X, Y");
  e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
  e.setMinLines(10);
  ScrollView sv=new ScrollView(this);
@@ -268,9 +268,9 @@ private void saveImportedKeyboard(String raw){
   sync.setPackage(getPackageName());
   sync.putExtra("data",raw);
   sendBroadcast(sync);
-  status.setText("✅ COORDINATE TASTIERA SALVATE\\n26/26 coordinate");
+  status.setText("✅ COORDINATE TASTIERA SALVATE\n26/26 coordinate");
  }catch(Exception ex){
-  status.setText("❌ COORDINATE NON SALVATE\\nFormato richiesto: A = X, Y ... Z = X, Y");
+  status.setText("❌ COORDINATE NON SALVATE\nFormato richiesto: A = X, Y ... Z = X, Y");
  }
 }
 private String joinKeyboardCoordinates(float[] c){
@@ -283,7 +283,7 @@ private String joinKeyboardCoordinates(float[] c){
  e.setText("");
  e.setTextSize(13);
  e.setGravity(android.view.Gravity.TOP);
- e.setHint("CODYBOT_SCHEMA_V3|9\\nROW|1|...\\nROW|2|...");
+ e.setHint("CODYBOT_SCHEMA_V3|9\nROW|1|...\nROW|2|...");
  e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
  ScrollView sv=new ScrollView(this);
  sv.setPadding(18,0,18,0);
