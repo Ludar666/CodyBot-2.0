@@ -69,8 +69,6 @@ public class MainActivity extends Activity {
         setup.setPadding(4,22,4,10);
         menu.addView(setup);
         menu.addView(mainMenuButton("⚙  IMPOSTAZIONI","Sovrapposizione e accessibilità",v->showSettingsMenu()));
-        menu.addView(mainMenuButton("❌  CHIUDI CODYBOT","Chiudi CodyBot e torna alla schermata principale",v->closeCodyBot()));
-
         TextView statusTitle=new TextView(this);
         statusTitle.setText("STATO");
         statusTitle.setTextColor(android.graphics.Color.rgb(0,188,212));
@@ -88,6 +86,8 @@ public class MainActivity extends Activity {
         statusBg.setCornerRadius(18);
         status.setBackground(statusBg);
         menu.addView(status,new LinearLayout.LayoutParams(-1,-2));
+
+        menu.addView(mainMenuButton("❌  CHIUDI CODYBOT","Chiudi CodyBot e torna alla schermata principale",v->closeCodyBot()));
 
         scroll.addView(menu);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
