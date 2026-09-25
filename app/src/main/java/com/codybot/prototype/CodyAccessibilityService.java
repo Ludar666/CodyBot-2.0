@@ -77,8 +77,8 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
   try{
     for(String line:lines){String t=line.trim();int eq=t.indexOf("=");if(eq<0)continue;String left=t.substring(0,eq).trim();if(left.length()!=1)continue;int p=calibrationLetters.indexOf(Character.toUpperCase(left.charAt(0)));if(p<0)continue;String[] xy=t.substring(eq+1).trim().split(",");if(xy.length<2)continue;c[p*2]=Float.parseFloat(xy[0].trim());c[p*2+1]=Float.parseFloat(xy[1].trim());seen[p]=true;}
     for(boolean ok:seen)if(!ok)throw new IllegalArgumentException();
-    DisplayMetrics dm=getResources().getDisplayMetrics();manualCalibrationCenters=c;calibratedCenters=c.clone();saveManualCalibration(c,dm.widthPixels,dm.heightPixels);updateOverlayText("✅ CALIBRAZIONE TASTIERA IMPORTATA\\n26/26 coordinate salvate");
-  }catch(Exception e){updateOverlayText("❌ Importazione tastiera non valida\\nServono le 26 righe A = x, y ... Z = x, y.");}
+    DisplayMetrics dm=getResources().getDisplayMetrics();manualCalibrationCenters=c;calibratedCenters=c.clone();saveManualCalibration(c,dm.widthPixels,dm.heightPixels);updateOverlayText("✅ CALIBRAZIONE TASTIERA IMPORTATA\n26/26 coordinate salvate");
+  }catch(Exception e){updateOverlayText("❌ Importazione tastiera non valida\nServono le 26 righe A = x, y ... Z = x, y.");}
  }
  private void importSchemaCalibration(String raw){
   if(raw!=null&&raw.trim().startsWith("CODYBOT_SCHEMA_V3|")){try{String[] lines=raw.trim().split("\\r?\\n");int cols=Integer.parseInt(lines[0].substring(lines[0].indexOf("|")+1).trim());for(String line:lines){String t=line.trim();if(t.startsWith("ROW|1|")){String[] cells=t.split("\\|",3)[2].split(";");if(cells.length!=cols)throw new IllegalArgumentException();StringBuilder out=new StringBuilder();for(String cell:cells){String[] xy=cell.trim().split(",");if(xy.length!=2)throw new IllegalArgumentException();if(out.length()>0)out.append(",");out.append(Integer.parseInt(xy[0].trim())).append(",").append(Integer.parseInt(xy[1].trim()));}getSharedPreferences("codybot_schema",MODE_PRIVATE).edit().putString("centers_"+cols,out.toString()).apply();updateOverlayText("✅ SCHEMA V3 IMPORTATO");return;}}throw new IllegalArgumentException();}catch(Exception e){updateOverlayText("❌ Importazione schema V3 non valida");return;}}
@@ -91,7 +91,7 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
     }
     if(len>0&&centers!=null&&count==len)saveSchemaCalibration(len,centers,getResources().getDisplayMetrics().widthPixels,getResources().getDisplayMetrics().heightPixels);else throw new IllegalArgumentException();
     updateOverlayText("✅ CALIBRAZIONI SCHEMA IMPORTATE");
-  }catch(Exception e){updateOverlayText("❌ Importazione schemi non valida\\nUsa il testo prodotto da ESPORTA SCHEMA.");}
+  }catch(Exception e){updateOverlayText("❌ Importazione schemi non valida\nUsa il testo prodotto da ESPORTA SCHEMA.");}
  }
 
  private void loadAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);advanceX=p.getFloat("x",DEFAULT_ADVANCE_X);advanceY=p.getFloat("y",DEFAULT_ADVANCE_Y);}
@@ -114,7 +114,7 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
   p.addView(t,new LinearLayout.LayoutParams(-1,-2));
 
   TextView m=new TextView(this);
-  m.setText("1. Apri CodyCross e portalo sulla schermata da testare.\\n\\n2. Quando sei pronto, premi AVVIA TEST.\\n\\n3. CodyBot eseguirà un solo tap sulle coordinate salvate.\\n\\nCoordinate salvate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
+  m.setText("1. Apri CodyCross e portalo sulla schermata da testare.\n\n2. Quando sei pronto, premi AVVIA TEST.\n\n3. CodyBot eseguirà un solo tap sulle coordinate salvate.\n\nCoordinate salvate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
   m.setTextColor(Color.WHITE); m.setTextSize(16); m.setPadding(0,20,0,20);
   p.addView(m,new LinearLayout.LayoutParams(-1,-2));
 
@@ -151,7 +151,7 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
   p.setBackgroundColor(Color.parseColor("#EE111111"));
 
   advanceTestStatus=new TextView(this);
-  advanceTestStatus.setText("🧪 TEST IN PREPARAZIONE\\nCoordinate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY)+"\\nAttendi...");
+  advanceTestStatus.setText("🧪 TEST IN PREPARAZIONE\nCoordinate: X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY)+"\nAttendi...");
   advanceTestStatus.setTextColor(Color.WHITE);
   advanceTestStatus.setTextSize(15);
   advanceTestStatus.setGravity(Gravity.CENTER);
@@ -186,15 +186,15 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
   if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);
   advanceTestAction=()->{
     if(!advanceTestRunning||advanceTestPaused)return;
-    if(advanceTestStatus!=null)advanceTestStatus.setText("🧪 TEST IN CORSO\\nEseguo tap su X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
+    if(advanceTestStatus!=null)advanceTestStatus.setText("🧪 TEST IN CORSO\nEseguo tap su X = "+Math.round(advanceX)+"   Y = "+Math.round(advanceY));
     tap(advanceX,advanceY,new GestureResultCallback(){
       @Override public void onCompleted(GestureDescription g){
         if(!advanceTestRunning)return;
-        if(advanceTestStatus!=null)advanceTestStatus.setText("✅ TAP ESEGUITO\\nX = "+Math.round(advanceX)+"\\nY = "+Math.round(advanceY));
+        if(advanceTestStatus!=null)advanceTestStatus.setText("✅ TAP ESEGUITO\nX = "+Math.round(advanceX)+"\nY = "+Math.round(advanceY));
       }
       @Override public void onCancelled(GestureDescription g){
         if(!advanceTestRunning)return;
-        if(advanceTestStatus!=null)advanceTestStatus.setText("❌ TAP ANNULLATO\\nAndroid non ha eseguito il gesto.\\nPremi RIPRENDI per riprovare.");
+        if(advanceTestStatus!=null)advanceTestStatus.setText("❌ TAP ANNULLATO\nAndroid non ha eseguito il gesto.\nPremi RIPRENDI per riprovare.");
       }
     });
   };
@@ -205,13 +205,13 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
   if(!advanceTestRunning)return;
   advanceTestPaused=true;
   if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);
-  if(advanceTestStatus!=null)advanceTestStatus.setText("⏸ TEST SOSPESO\\nIl test è in pausa.\\nPremi RIPRENDI per continuare.");
+  if(advanceTestStatus!=null)advanceTestStatus.setText("⏸ TEST SOSPESO\nIl test è in pausa.\nPremi RIPRENDI per continuare.");
  }
 
  private void resumeAdvanceTest(){
   if(!advanceTestRunning)return;
   advanceTestPaused=false;
-  if(advanceTestStatus!=null)advanceTestStatus.setText("▶ TEST RIPRESO\\nPreparazione del tap...");
+  if(advanceTestStatus!=null)advanceTestStatus.setText("▶ TEST RIPRESO\nPreparazione del tap...");
   scheduleAdvanceTestTap(400);
  }
 
@@ -441,7 +441,7 @@ private void loadManualCalibration(){
     // Safety: never blindly type the whole answer if the schema position
     // detection produced no positive match.
     if(found.isEmpty()){
-      updateOverlayText("⚠️ Schema non riconosciuto con sufficiente sicurezza\\nNessuna lettera confermata: non digito.");
+      updateOverlayText("⚠️ Schema non riconosciuto con sufficiente sicurezza\nNessuna lettera confermata: non digito.");
       compiling=false;
       pendingCompilation.clear();
       calibratedCenters=null;
@@ -580,7 +580,7 @@ private void loadManualCalibration(){
   p.addView(t,new LinearLayout.LayoutParams(-1,-2));
 
   TextView m=new TextView(this);
-  m.setText("1. Apri CodyCross.\\n\\n2. Entra in una domanda e lascia visibili tutte le caselle dello schema.\\n\\n3. Premi AVVIA ACQUISIZIONE.\\n\\nCodyBot ti chiederà di toccare il centro delle posizioni 1, 2, 3... fino alla fine.\\n\\n⚠️ Tocca solo le caselle dello schema, non la tastiera.");
+  m.setText("1. Apri CodyCross.\n\n2. Entra in una domanda e lascia visibili tutte le caselle dello schema.\n\n3. Premi AVVIA ACQUISIZIONE.\n\nCodyBot ti chiederà di toccare il centro delle posizioni 1, 2, 3... fino alla fine.\n\n⚠️ Tocca solo le caselle dello schema, non la tastiera.");
   m.setTextColor(Color.WHITE);
   m.setTextSize(16);
   m.setPadding(0,20,0,20);
@@ -632,7 +632,7 @@ private void loadManualCalibration(){
   p.setTextSize(18);
   p.setGravity(Gravity.CENTER);
   p.setBackgroundColor(Color.parseColor("#DD000000"));
-  p.setText("🔧 CALIBRAZIONE SCHEMA\\n\\nTocca il centro della posizione 1\\n0/"+length+"\\n\\nCodyCross deve essere visibile.");
+  p.setText("🔧 CALIBRAZIONE SCHEMA\n\nTocca il centro della posizione 1\n0/"+length+"\n\nCodyCross deve essere visibile.");
   FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);
   pp.topMargin=55;
   f.addView(p,pp);
@@ -648,11 +648,11 @@ private void loadManualCalibration(){
     idx[0]++;
 
     if(idx[0]<length){
-      p.setText("🔧 CALIBRAZIONE SCHEMA\\n\\nTocca il centro della posizione "+(idx[0]+1)+"\\n"+idx[0]+"/"+length+"\\n\\nCodyCross deve essere visibile.");
+      p.setText("🔧 CALIBRAZIONE SCHEMA\n\nTocca il centro della posizione "+(idx[0]+1)+"\n"+idx[0]+"/"+length+"\n\nCodyCross deve essere visibile.");
     }else{
       saveSchemaCalibration(length,centers,sw,sh);
       removeCalibrationOverlay();
-      updateOverlayText("✅ SCHEMA "+length+" LETTERE CALIBRATO\\n"+length+"/"+length+" posizioni salvate");
+      updateOverlayText("✅ SCHEMA "+length+" LETTERE CALIBRATO\n"+length+"/"+length+" posizioni salvate");
     }
     return true;
   });
@@ -725,7 +725,7 @@ private void showSchemaTestControls(){
   p.setOrientation(LinearLayout.VERTICAL); p.setGravity(Gravity.CENTER_HORIZONTAL);
   p.setPadding(18,12,18,12); p.setBackgroundColor(Color.parseColor("#EE111111"));
   schemaTestStatus=new TextView(this);
-  schemaTestStatus.setText("🧪 TEST SCHEMA\\nPreparazione...");
+  schemaTestStatus.setText("🧪 TEST SCHEMA\nPreparazione...");
   schemaTestStatus.setTextColor(Color.WHITE); schemaTestStatus.setTextSize(15); schemaTestStatus.setGravity(Gravity.CENTER);
   p.addView(schemaTestStatus,new LinearLayout.LayoutParams(-1,-2));
   LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER);
@@ -750,16 +750,16 @@ private void scheduleSchemaTestPosition(long delay){
     if(schemaTestIndex>=schemaTestLength){finishSchemaTest();return;}
     final int n=schemaTestIndex+1;
     final int x=schemaTestCenters[schemaTestIndex*2], y=schemaTestCenters[schemaTestIndex*2+1];
-    if(schemaTestStatus!=null)schemaTestStatus.setText("🧪 TEST SCHEMA\\nProssima posizione: "+n+"/"+schemaTestLength);
+    if(schemaTestStatus!=null)schemaTestStatus.setText("🧪 TEST SCHEMA\nProssima posizione: "+n+"/"+schemaTestLength);
     tap(x,y,new GestureResultCallback(){
       @Override public void onCompleted(GestureDescription g){
         if(!schemaTestRunning)return;
         schemaTestIndex++;
-        if(schemaTestStatus!=null)schemaTestStatus.setText("🧪 TEST SCHEMA\\nPosizione "+n+"/"+schemaTestLength);
+        if(schemaTestStatus!=null)schemaTestStatus.setText("🧪 TEST SCHEMA\nPosizione "+n+"/"+schemaTestLength);
         if(schemaTestIndex<schemaTestLength)scheduleSchemaTestPosition(650); else finishSchemaTest();
       }
       @Override public void onCancelled(GestureDescription g){
-        if(schemaTestStatus!=null)schemaTestStatus.setText("❌ TAP ANNULLATO\\nPosizione "+n+"/"+schemaTestLength+"\\nPremi CONTINUA per riprovare.");
+        if(schemaTestStatus!=null)schemaTestStatus.setText("❌ TAP ANNULLATO\nPosizione "+n+"/"+schemaTestLength+"\nPremi CONTINUA per riprovare.");
       }
     });
   };
@@ -769,7 +769,7 @@ private void pauseSchemaTest(){
   if(!schemaTestRunning)return;
   schemaTestPaused=true;
   if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
-  if(schemaTestStatus!=null)schemaTestStatus.setText("⏸ TEST SOSPESO\\nPremi CONTINUA per riprendere.");
+  if(schemaTestStatus!=null)schemaTestStatus.setText("⏸ TEST SOSPESO\nPremi CONTINUA per riprendere.");
 }
 private void resumeSchemaTest(){
   if(!schemaTestRunning)return;
@@ -789,7 +789,7 @@ private void finishSchemaTest(){
   if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
   schemaTestAction=null; schemaTestCenters=null;
   removeSchemaTestControls(); restoreMainScanOverlay();
-  updateOverlayText("✅ TEST SCHEMA TERMINATO\\nControlla le posizioni su CodyCross.");
+  updateOverlayText("✅ TEST SCHEMA TERMINATO\nControlla le posizioni su CodyCross.");
 }
 private void removeSchemaTestControls(){
   if(schemaTestControls!=null&&windowManager!=null)try{windowManager.removeView(schemaTestControls);}catch(Exception ignored){}
@@ -805,7 +805,7 @@ private void removeSchemaTestControls(){
  }
  private void hideOverlay(){overlayHidden=true;stopCompilation();handler.removeCallbacks(overlayChecker);removeCalibrationOverlay();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;statusText=null;try{stopService(new Intent(this,ScreenCaptureService.class));}catch(Exception ignored){}handler.postDelayed(()->{try{disableSelf();}catch(Exception ignored){}},150);}
  private java.util.Set<Integer> alignDetectedLetters(String clean,java.util.List<Character> detected){java.util.Set<Integer> matched=new java.util.HashSet<Integer>();if(detected==null||detected.isEmpty())return matched;int n=clean.length(),m=detected.size();int[][] dp=new int[n+1][m+1];for(int i=1;i<=n;i++)for(int j=1;j<=m;j++){int best=Math.max(dp[i-1][j],dp[i][j-1]);if(clean.charAt(i-1)==detected.get(j-1))best=Math.max(best,dp[i-1][j-1]+1);dp[i][j]=best;}int i=n,j=m;while(i>0&&j>0){if(clean.charAt(i-1)==detected.get(j-1)&&dp[i][j]==dp[i-1][j-1]+1){matched.add(i-1);i--;j--;}else if(dp[i-1][j]>=dp[i][j-1])i--;else j--;}return matched;}
- private void scheduleAnswerTaps(String clean,java.util.Set<Integer> existing){if(!compiling)return;DisplayMetrics dm=getResources().getDisplayMetrics();float w=dm.widthPixels,h=dm.heightPixels;int index=0,skipped=0;for(int i=0;i<clean.length();i++){if(existing.contains(i)){skipped++;continue;}final char c=clean.charAt(i);final float[] xy=calibratedKeyCenter(c,w,h);if(xy==null){updateOverlayText("⚠️ Nessuna coordinata calibrata per "+c+"\\nEsegui CALIBRA TASTIERA prima di compilare.");compiling=false;pendingCompilation.clear();calibratedCenters=null;return;}final long d=index*240L;index++;Runnable r=()->{if(compiling&&ScreenCaptureService.isServiceRunning())tap(xy[0],xy[1]);};pendingCompilation.add(r);handler.postDelayed(r,d);}final int n=clean.length(),s=skipped;Runnable f=()->{if(!compiling)return;compiling=false;pendingCompilation.clear();calibratedCenters=null;ScreenCaptureService.resetLastClue();updateOverlayText("✅ COMPILATA: "+clean+"\\nGià presenti: "+s+"/"+n);};pendingCompilation.add(f);handler.postDelayed(f,Math.max(300,index*240L+300L));}
+ private void scheduleAnswerTaps(String clean,java.util.Set<Integer> existing){if(!compiling)return;DisplayMetrics dm=getResources().getDisplayMetrics();float w=dm.widthPixels,h=dm.heightPixels;int index=0,skipped=0;for(int i=0;i<clean.length();i++){if(existing.contains(i)){skipped++;continue;}final char c=clean.charAt(i);final float[] xy=calibratedKeyCenter(c,w,h);if(xy==null){updateOverlayText("⚠️ Nessuna coordinata calibrata per "+c+"\nEsegui CALIBRA TASTIERA prima di compilare.");compiling=false;pendingCompilation.clear();calibratedCenters=null;return;}final long d=index*240L;index++;Runnable r=()->{if(compiling&&ScreenCaptureService.isServiceRunning())tap(xy[0],xy[1]);};pendingCompilation.add(r);handler.postDelayed(r,d);}final int n=clean.length(),s=skipped;Runnable f=()->{if(!compiling)return;compiling=false;pendingCompilation.clear();calibratedCenters=null;ScreenCaptureService.resetLastClue();updateOverlayText("✅ COMPILATA: "+clean+"\nGià presenti: "+s+"/"+n);};pendingCompilation.add(f);handler.postDelayed(f,Math.max(300,index*240L+300L));}
  private float[] calibratedKeyCenter(char c,float w,float h){String a="QWERTYUIOP",b="ASDFGHJKL",d="ZXCVBNM";int i;if(manualCalibrationCenters!=null&&manualCalibrationCenters.length==52){int p=calibrationLetters.indexOf(c);if(p>=0)return new float[]{manualCalibrationCenters[p*2],manualCalibrationCenters[p*2+1]};}return null;}
  private float[] keyCenter(char c,float w,float h){String a="QWERTYUIOP",b="ASDFGHJKL",d="ZXCVBNM";int i;if((i=a.indexOf(c))>=0)return new float[]{w*(.05f+i*.10f),h*.77f};if((i=b.indexOf(c))>=0)return new float[]{w*(.10f+i*.10f),h*.855f};if((i=d.indexOf(c))>=0)return new float[]{w*(.25f+i*.10f),h*.94f};return null;}
  private void tap(float x,float y){tap(x,y,null);}
