@@ -39,7 +39,7 @@ import java.util.Set;
 public class CodyAccessibilityService extends AccessibilityService {
  private WindowManager windowManager; private View overlayView; private volatile boolean overlayHidden=false; private TextView statusText; private View calibrationView; private final Handler handler=new Handler(Looper.getMainLooper());
  private final List<Runnable> pendingCompilation=new ArrayList<>(); private boolean compiling=false; private static volatile String lastTargetPackage=""; private volatile boolean calibrationInProgress=false; private final String calibrationLetters="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; private int calibrationIndex=0; private float[] manualCalibrationCenters; private volatile float[] calibratedCenters; private TextRecognizer recognizer; private volatile boolean schemaCapturePending=false; private volatile String currentSchemaAnswer="";
- private volatile boolean keyboardTestArmed=false; private boolean keyboardTestRunning=false; private boolean keyboardTestPaused=false; private int keyboardTestIndex=0; private Runnable keyboardTestAction; private View keyboardTestControls; private TextView keyboardTestStatus;
+ private volatile boolean keyboardTestArmed=false; private boolean keyboardTestRunning=false; private boolean keyboardTestPaused=false; private int keyboardTestIndex=0; private Runnable keyboardTestAction; private View keyboardTestControls; private TextView keyboardTestStatus; private volatile boolean schemaTestArmed=false; private boolean schemaTestRunning=false; private boolean schemaTestPaused=false; private int schemaTestIndex=0; private int schemaTestLength=0; private int[] schemaTestCenters; private Runnable schemaTestAction; private View schemaTestControls; private TextView schemaTestStatus;
  private static final float DEFAULT_ADVANCE_X=997f;
  private static final float DEFAULT_ADVANCE_Y=1542f;
  private float advanceX=DEFAULT_ADVANCE_X, advanceY=DEFAULT_ADVANCE_Y;
@@ -54,6 +54,10 @@ else if("com.codybot.TEST_KEYBOARD".equals(a)){runKeyboardTest();}else if("com.c
  if(keyboardTestArmed){
   keyboardTestArmed=false;
   handler.postDelayed(this::showKeyboardTestReadyOverlay,500);
+ }
+ if(schemaTestArmed){
+  schemaTestArmed=false;
+  handler.postDelayed(this::showSchemaTestReadyOverlay,500);
  }
  if(advanceDetectionArmed){
   advanceDetectionArmed=false;
@@ -666,7 +670,132 @@ private void loadManualCalibration(){
  private void saveSchemaCalibration(int length,int[] centers,int w,int h){StringBuilder sb=new StringBuilder();for(int i=0;i<centers.length;i++){if(i>0)sb.append(',');sb.append(centers[i]);}getSharedPreferences("codybot_schema",MODE_PRIVATE).edit().putString("centers_"+length,sb.toString()).putInt("width_"+length,w).putInt("height_"+length,h).apply();}
  private int[] getSchemaCenters(int length){String raw=getSharedPreferences("codybot_schema",MODE_PRIVATE).getString("centers_"+length,null);if(raw==null&&length==9)raw="83,422,212,406,321,428,438,419,550,415,656,414,778,418,879,424,1009,422";if(raw==null)return null;String[] p=raw.split(",");if(p.length!=length*2)return null;try{int[] c=new int[p.length];for(int i=0;i<p.length;i++)c[i]=Integer.parseInt(p[i].trim());return c;}catch(Exception e){return null;}}
  private boolean hasSchemaCalibration(int length){return getSchemaCenters(length)!=null;}
- private void testSchemaCalibration(int length){int[] c=getSchemaCenters(length);if(c==null){updateOverlayText("⚠️ Nessuna calibrazione per "+length+" lettere");return;}compiling=true;updateOverlayText("🧪 TEST SCHEMA "+length+" LETTERE");for(int i=0;i<length;i++){final int n=i+1;final int x=c[i*2],y=c[i*2+1];Runnable r=()->{if(compiling){tap(x,y);updateOverlayText("🧪 TEST SCHEMA\nPosizione "+n+"/"+length);}};pendingCompilation.add(r);handler.postDelayed(r,i*350L);}Runnable f=()->{if(compiling){compiling=false;pendingCompilation.clear();updateOverlayText("🧪 TEST SCHEMA TERMINATO");}};pendingCompilation.add(f);handler.postDelayed(f,length*350L+500L);}
+ private void testSchemaCalibration(int length){
+  stopCompilation();
+  hideMainScanOverlay();
+  int[] c=getSchemaCenters(length);
+  if(c==null){
+    restoreMainScanOverlay();
+    updateOverlayText("⚠️ Nessuna calibrazione per "+length+" lettere");
+    return;
+  }
+  schemaTestLength=length;
+  schemaTestCenters=c.clone();
+  schemaTestArmed=true;
+  updateOverlayText("🧪 TEST SCHEMA PRONTO\nPassa a CodyCross.\nQuando CodyCross è visibile comparirà AVVIA TEST.");
+}
+private void showSchemaTestReadyOverlay(){
+  if(!Settings.canDrawOverlays(this)||schemaTestCenters==null)return;
+  if(schemaTestControls!=null)removeSchemaTestControls();
+  LinearLayout p=new LinearLayout(this);
+  p.setOrientation(LinearLayout.VERTICAL);
+  p.setGravity(Gravity.CENTER_HORIZONTAL);
+  p.setPadding(22,16,22,16);
+  p.setBackgroundColor(Color.parseColor("#EE111111"));
+  TextView t=new TextView(this);
+  t.setText("🧪 TEST SCHEMA");
+  t.setTextColor(Color.WHITE); t.setTextSize(19); t.setGravity(Gravity.CENTER);
+  p.addView(t,new LinearLayout.LayoutParams(-1,-2));
+  TextView m=new TextView(this);
+  m.setText("CodyCross è pronto.\nPremi AVVIA TEST per verificare le posizioni dello schema.");
+  m.setTextColor(Color.WHITE); m.setTextSize(15); m.setGravity(Gravity.CENTER); m.setPadding(0,10,0,12);
+  p.addView(m,new LinearLayout.LayoutParams(-1,-2));
+  LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER);
+  Button start=new Button(this); start.setText("▶ AVVIA TEST");
+  Button cancel=new Button(this); cancel.setText("ANNULLA");
+  start.setOnClickListener(v->{removeSchemaTestControls();startSchemaTest();});
+  cancel.setOnClickListener(v->{schemaTestArmed=false;removeSchemaTestControls();schemaTestCenters=null;restoreMainScanOverlay();});
+  row.addView(start); row.addView(cancel); p.addView(row);
+  schemaTestControls=p;
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(getResources().getDisplayMetrics().widthPixels*.92f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=95;
+  try{windowManager.addView(schemaTestControls,q);}
+  catch(Exception e){schemaTestControls=null;restoreMainScanOverlay();updateOverlayText("❌ Errore test schema: "+e.getClass().getSimpleName());}
+}
+private void startSchemaTest(){
+  stopCompilation();
+  if(schemaTestCenters==null||schemaTestLength<1){restoreMainScanOverlay();return;}
+  schemaTestRunning=true; schemaTestPaused=false; schemaTestIndex=0;
+  showSchemaTestControls();
+  scheduleSchemaTestPosition(300);
+}
+private void showSchemaTestControls(){
+  if(schemaTestControls!=null)removeSchemaTestControls();
+  LinearLayout p=new LinearLayout(this);
+  p.setOrientation(LinearLayout.VERTICAL); p.setGravity(Gravity.CENTER_HORIZONTAL);
+  p.setPadding(18,12,18,12); p.setBackgroundColor(Color.parseColor("#EE111111"));
+  schemaTestStatus=new TextView(this);
+  schemaTestStatus.setText("🧪 TEST SCHEMA\\nPreparazione...");
+  schemaTestStatus.setTextColor(Color.WHITE); schemaTestStatus.setTextSize(15); schemaTestStatus.setGravity(Gravity.CENTER);
+  p.addView(schemaTestStatus,new LinearLayout.LayoutParams(-1,-2));
+  LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER);
+  Button pause=new Button(this); pause.setText("⏸ SOSPENDI");
+  Button resume=new Button(this); resume.setText("▶ CONTINUA");
+  Button stop=new Button(this); stop.setText("⏹ TERMINA");
+  pause.setOnClickListener(v->pauseSchemaTest());
+  resume.setOnClickListener(v->resumeSchemaTest());
+  stop.setOnClickListener(v->stopSchemaTest());
+  row.addView(pause); row.addView(resume); row.addView(stop); p.addView(row);
+  schemaTestControls=p;
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(getResources().getDisplayMetrics().widthPixels*.94f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=70;
+  try{windowManager.addView(schemaTestControls,q);}
+  catch(Exception e){schemaTestControls=null;stopSchemaTest();}
+}
+private void scheduleSchemaTestPosition(long delay){
+  if(!schemaTestRunning||schemaTestPaused)return;
+  if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
+  schemaTestAction=()->{
+    if(!schemaTestRunning||schemaTestPaused)return;
+    if(schemaTestIndex>=schemaTestLength){finishSchemaTest();return;}
+    final int n=schemaTestIndex+1;
+    final int x=schemaTestCenters[schemaTestIndex*2], y=schemaTestCenters[schemaTestIndex*2+1];
+    if(schemaTestStatus!=null)schemaTestStatus.setText("🧪 TEST SCHEMA\\nProssima posizione: "+n+"/"+schemaTestLength);
+    tap(x,y,new GestureResultCallback(){
+      @Override public void onCompleted(GestureDescription g){
+        if(!schemaTestRunning)return;
+        schemaTestIndex++;
+        if(schemaTestStatus!=null)schemaTestStatus.setText("🧪 TEST SCHEMA\\nPosizione "+n+"/"+schemaTestLength);
+        if(schemaTestIndex<schemaTestLength)scheduleSchemaTestPosition(650); else finishSchemaTest();
+      }
+      @Override public void onCancelled(GestureDescription g){
+        if(schemaTestStatus!=null)schemaTestStatus.setText("❌ TAP ANNULLATO\\nPosizione "+n+"/"+schemaTestLength+"\\nPremi CONTINUA per riprovare.");
+      }
+    });
+  };
+  handler.postDelayed(schemaTestAction,delay);
+}
+private void pauseSchemaTest(){
+  if(!schemaTestRunning)return;
+  schemaTestPaused=true;
+  if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
+  if(schemaTestStatus!=null)schemaTestStatus.setText("⏸ TEST SOSPESO\\nPremi CONTINUA per riprendere.");
+}
+private void resumeSchemaTest(){
+  if(!schemaTestRunning)return;
+  schemaTestPaused=false;
+  if(schemaTestStatus!=null)schemaTestStatus.setText("▶ TEST RIPRESO");
+  scheduleSchemaTestPosition(250);
+}
+private void stopSchemaTest(){
+  schemaTestRunning=false; schemaTestPaused=false; schemaTestArmed=false;
+  if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
+  schemaTestAction=null; schemaTestCenters=null; pendingCompilation.clear();
+  removeSchemaTestControls(); restoreMainScanOverlay();
+  updateOverlayText("⏹ TEST SCHEMA TERMINATO");
+}
+private void finishSchemaTest(){
+  schemaTestRunning=false; schemaTestPaused=false;
+  if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
+  schemaTestAction=null; schemaTestCenters=null;
+  removeSchemaTestControls(); restoreMainScanOverlay();
+  updateOverlayText("✅ TEST SCHEMA TERMINATO\\nControlla le posizioni su CodyCross.");
+}
+private void removeSchemaTestControls(){
+  if(schemaTestControls!=null&&windowManager!=null)try{windowManager.removeView(schemaTestControls);}catch(Exception ignored){}
+  schemaTestControls=null; schemaTestStatus=null;
+}
+
  private void exportSchemaCalibration(){StringBuilder sb=new StringBuilder("CodyBot - Calibrazione schema\n\n");boolean any=false;for(int length=1;length<=20;length++){int[] c=getSchemaCenters(length);if(c==null)continue;any=true;int w=getSharedPreferences("codybot_schema",MODE_PRIVATE).getInt("width_"+length,0),h=getSharedPreferences("codybot_schema",MODE_PRIVATE).getInt("height_"+length,0);sb.append(length).append(" lettere - Schermo ").append(w).append(" x ").append(h).append("\n");for(int i=0;i<length;i++)sb.append(i+1).append(" = ").append(c[i*2]).append(", ").append(c[i*2+1]).append("\n");sb.append("\n");}if(!any){new android.app.AlertDialog.Builder(this).setTitle("Calibrazione schema").setMessage("Nessuna calibrazione salvata.").setPositiveButton("OK",null).show();return;}final String out=sb.toString();new android.app.AlertDialog.Builder(this).setTitle("Calibrazione schema").setMessage(out).setPositiveButton("COPIA",(d,w)->{android.content.ClipboardManager cb=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(android.content.ClipData.newPlainText("CodyBot schema",out));updateOverlayText("✅ CALIBRAZIONE SCHEMA COPIATA");}).setNegativeButton("CHIUDI",null).show();}
 
  public void handleSchemaBitmap(Bitmap bitmap){
@@ -681,8 +810,8 @@ private void loadManualCalibration(){
  private float[] keyCenter(char c,float w,float h){String a="QWERTYUIOP",b="ASDFGHJKL",d="ZXCVBNM";int i;if((i=a.indexOf(c))>=0)return new float[]{w*(.05f+i*.10f),h*.77f};if((i=b.indexOf(c))>=0)return new float[]{w*(.10f+i*.10f),h*.855f};if((i=d.indexOf(c))>=0)return new float[]{w*(.25f+i*.10f),h*.94f};return null;}
  private void tap(float x,float y){tap(x,y,null);}
  private void tap(float x,float y,GestureResultCallback callback){Path p=new Path();p.moveTo(x,y);GestureDescription.StrokeDescription s=new GestureDescription.StrokeDescription(p,0,80);GestureDescription g=new GestureDescription.Builder().addStroke(s).build();boolean accepted=dispatchGesture(g,callback,null);if(!accepted&&advanceTestStatus!=null)advanceTestStatus.setText("❌ TAP RIFIUTATO\nIl servizio Accessibilità non ha accettato il gesto.\nVerifica che CodyBot sia attivo nelle impostazioni Accessibilità.");}
- private void stopCompilation(){for(Runnable r:pendingCompilation)handler.removeCallbacks(r);pendingCompilation.clear();compiling=false;if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);keyboardTestAction=null;if(keyboardTestRunning){keyboardTestRunning=false;keyboardTestPaused=false;removeKeyboardTestControls();restoreMainScanOverlay();}if(statusText!=null)statusText.setText("🔴 STOP");}
+ private void stopCompilation(){for(Runnable r:pendingCompilation)handler.removeCallbacks(r);pendingCompilation.clear();compiling=false;if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);keyboardTestAction=null;if(keyboardTestRunning){keyboardTestRunning=false;keyboardTestPaused=false;removeKeyboardTestControls();restoreMainScanOverlay();}if(schemaTestRunning){schemaTestRunning=false;schemaTestPaused=false;if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);schemaTestAction=null;removeSchemaTestControls();schemaTestCenters=null;restoreMainScanOverlay();}if(statusText!=null)statusText.setText("🔴 STOP");}
  private void updateOverlayText(String m){Intent i=new Intent("com.codybot.UPDATE_OVERLAY");i.setPackage(getPackageName());i.putExtra("message",m);sendBroadcast(i);}
  @Override public void onInterrupt(){}
- @Override public void onDestroy(){overlayHidden=true;stopCompilation();if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);removeAdvanceTestControls();if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);removeKeyboardTestControls();handler.removeCallbacks(overlayChecker);if(recognizer!=null)recognizer.close();try{unregisterReceiver(overlayReceiver);}catch(Exception ignored){}removeCoordinateView();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;super.onDestroy();}
+ @Override public void onDestroy(){overlayHidden=true;stopCompilation();if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);removeAdvanceTestControls();if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);removeKeyboardTestControls();if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);removeSchemaTestControls();handler.removeCallbacks(overlayChecker);if(recognizer!=null)recognizer.close();try{unregisterReceiver(overlayReceiver);}catch(Exception ignored){}removeCoordinateView();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;super.onDestroy();}
 }
