@@ -161,7 +161,7 @@ public class MainActivity extends Activity {
                 status.setText("CALIBRAZIONE TASTIERA AVVIATA\\n\\nTocca A-Z sulla tastiera CodyCross.");
             } else if(w==1){
                 Intent i=new Intent("com.codybot.ARM_TEST_KEYBOARD");i.setPackage(getPackageName());sendBroadcast(i);
-                status.setText("🧪 TEST TASTIERA PRONTO\\n\\nPassa ora a CodyCross.\\nIl test A-Z partirà automaticamente quando CodyCross diventa l'app in primo piano.");
+                status.setText("🧪 TEST TASTIERA PRONTO\\n\\nOra puoi tornare su CodyCross.\\nQuando CodyCross è visibile comparirà AVVIA TEST.");
             } else if(w==2) importKeyboardCalibration();
             else if(w==3) exportCalibration();
             else showKeyboardCoordinates();
