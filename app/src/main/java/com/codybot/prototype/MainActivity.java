@@ -341,6 +341,10 @@ private String joinKeyboardCoordinates(float[] c){
                 out.append('\n');
             }
             getSharedPreferences("codybot_schema_v3",MODE_PRIVATE).edit().putString("schema_"+cols,out.toString()).apply();
+            Intent sync=new Intent("com.codybot.IMPORT_SCHEMA");
+            sync.setPackage(getPackageName());
+            sync.putExtra("data",out.toString());
+            sendBroadcast(sync);
             status.setText("✅ SCHEMA V3 IMPORTATO\n"+normalized.size()+" righe regolarizzate\n"+cols+" caselle per parola");
         }catch(Exception ex){
             new AlertDialog.Builder(this).setTitle("Importazione non valida").setMessage("Il formato non è valido. Servono righe ROW con lo stesso numero di caselle.").setPositiveButton("OK",null).show();
