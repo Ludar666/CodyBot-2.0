@@ -303,7 +303,41 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
  }
  private void removeCoordinateView(){if(coordinateView!=null&&windowManager!=null)try{windowManager.removeView(coordinateView);}catch(Exception ignored){}coordinateView=null;}
  private void saveManualCalibration(float[] c,int w,int h){StringBuilder s=new StringBuilder();for(int i=0;i<c.length;i++){if(i>0)s.append(',');s.append(c[i]);}getSharedPreferences("codybot_keyboard",MODE_PRIVATE).edit().putString("centers",s.toString()).putInt("width",w).putInt("height",h).apply();}
- private void loadManualCalibration(){String raw=getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getString("centers",null);if(raw==null)return;String[] p=raw.split(",");if(p.length!=52)return;try{float[] c=new float[52];for(int i=0;i<52;i++)c[i]=Float.parseFloat(p[i]);manualCalibrationCenters=c;calibratedCenters=c.clone();}catch(Exception ignored){manualCalibrationCenters=null;}}
+ private static float[] defaultKeyboardCenters(){
+  return new float[]{
+    111,1915, 639,2133, 431,2125, 318,1929, 264,1762, 431,1945, 535,1953, 648,1952, 798,1768,
+    764,1959, 850,1935, 985,1943, 864,2133, 752,2121, 917,1740, 1032,1760, 54,1732, 375,1788,
+    221,1948, 479,1752, 692,1735, 535,2121, 165,1761, 332,2127, 579,1753, 197,2133
+  };
+}
+private void saveDefaultKeyboardCalibration(){
+  float[] c=defaultKeyboardCenters();
+  manualCalibrationCenters=c;
+  calibratedCenters=c.clone();
+  getSharedPreferences("codybot_keyboard",MODE_PRIVATE).edit()
+    .putString("centers",joinKeyboardCoordinates(c))
+    .putInt("width",1080).putInt("height",2400).apply();
+}
+private String joinKeyboardCoordinates(float[] c){
+  StringBuilder s=new StringBuilder();
+  for(int i=0;i<c.length;i++){if(i>0)s.append(',');s.append(c[i]);}
+  return s.toString();
+}
+private void loadManualCalibration(){
+  String raw=getSharedPreferences("codybot_keyboard",MODE_PRIVATE).getString("centers",null);
+  if(raw==null||raw.trim().isEmpty()){saveDefaultKeyboardCalibration();return;}
+  String[] p=raw.split(",");
+  if(p.length!=52){saveDefaultKeyboardCalibration();return;}
+  try{
+    float[] c=new float[52];
+    for(int i=0;i<52;i++){
+      c[i]=Float.parseFloat(p[i]);
+      if(!Float.isFinite(c[i]))throw new IllegalArgumentException();
+    }
+    manualCalibrationCenters=c;
+    calibratedCenters=c.clone();
+  }catch(Exception ignored){saveDefaultKeyboardCalibration();}
+}
  private void armKeyboardTest(){
   stopCompilation();
   if(manualCalibrationCenters==null||manualCalibrationCenters.length!=52){
