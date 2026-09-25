@@ -39,7 +39,7 @@ import java.util.Set;
 public class CodyAccessibilityService extends AccessibilityService {
  private WindowManager windowManager; private View overlayView; private volatile boolean overlayHidden=false; private TextView statusText; private View calibrationView; private final Handler handler=new Handler(Looper.getMainLooper());
  private final List<Runnable> pendingCompilation=new ArrayList<>(); private boolean compiling=false; private static volatile String lastTargetPackage=""; private volatile boolean calibrationInProgress=false; private final String calibrationLetters="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; private int calibrationIndex=0; private float[] manualCalibrationCenters; private volatile float[] calibratedCenters; private TextRecognizer recognizer; private volatile boolean schemaCapturePending=false; private volatile String currentSchemaAnswer="";
- private volatile boolean keyboardTestArmed=false;
+ private volatile boolean keyboardTestArmed=false; private boolean keyboardTestRunning=false; private boolean keyboardTestPaused=false; private int keyboardTestIndex=0; private Runnable keyboardTestAction; private View keyboardTestControls; private TextView keyboardTestStatus;
  private static final float DEFAULT_ADVANCE_X=997f;
  private static final float DEFAULT_ADVANCE_Y=1542f;
  private float advanceX=DEFAULT_ADVANCE_X, advanceY=DEFAULT_ADVANCE_Y;
@@ -53,7 +53,7 @@ else if("com.codybot.TEST_KEYBOARD".equals(a)){runKeyboardTest();}else if("com.c
  lastTargetPackage=n;
  if(keyboardTestArmed){
   keyboardTestArmed=false;
-  handler.postDelayed(this::runKeyboardTest,700);
+  handler.postDelayed(this::showKeyboardTestReadyOverlay,500);
  }
  if(advanceDetectionArmed){
   advanceDetectionArmed=false;
@@ -340,15 +340,67 @@ private void loadManualCalibration(){
   }catch(Exception ignored){saveDefaultKeyboardCalibration();}
 }
  private void armKeyboardTest(){
-  stopCompilation();
+  stopCompilation(); hideMainScanOverlay();
   if(manualCalibrationCenters==null||manualCalibrationCenters.length!=52){
-   updateOverlayText("⚠️ Nessuna calibrazione tastiera.\nEsegui CALIBRA TASTIERA o IMPORTA CALIBRAZIONE.");
-   return;
+   restoreMainScanOverlay(); updateOverlayText("⚠️ Nessuna calibrazione tastiera.\nEsegui CALIBRA TASTIERA o IMPORTA CALIBRAZIONE."); return;
   }
   keyboardTestArmed=true;
-  updateOverlayText("🧪 TEST TASTIERA PRONTO\nPassa a CodyCross.\nIl test A-Z partirà automaticamente quando CodyCross è in primo piano.");
+  updateOverlayText("🧪 TEST TASTIERA PRONTO\nPassa a CodyCross.\nQuando CodyCross è visibile comparirà il pannello AVVIA TEST.");
  }
- private void runKeyboardTest(){stopCompilation();if(manualCalibrationCenters==null||manualCalibrationCenters.length!=52){updateOverlayText("⚠️ Nessuna calibrazione tastiera.\nEsegui CALIBRA TASTIERA o IMPORTA CALIBRAZIONE.");return;}String clean="ABCDEFGHIJKLMNOPQRSTUVWXYZ";compiling=true;calibratedCenters=manualCalibrationCenters.clone();updateOverlayText("🧪 TEST TASTIERA\nCodyCross deve essere visibile.\nA-Z in corso...");DisplayMetrics dm=getResources().getDisplayMetrics();for(int i=0;i<clean.length();i++){final char c=clean.charAt(i);final float[] xy=calibratedKeyCenter(c,dm.widthPixels,dm.heightPixels);final int n=i+1;Runnable r=()->{if(compiling&&xy!=null){tap(xy[0],xy[1]);updateOverlayText("🧪 TEST TASTIERA\nPremuto: "+c+" ("+n+"/26)");}};pendingCompilation.add(r);handler.postDelayed(r,i*300L);}Runnable f=()->{if(compiling){compiling=false;pendingCompilation.clear();updateOverlayText("🧪 TEST TERMINATO\nControlla quali lettere sono state digitate.");}};pendingCompilation.add(f);handler.postDelayed(f,clean.length()*300L+500L);}
+ private void showKeyboardTestReadyOverlay(){
+  if(!Settings.canDrawOverlays(this)||manualCalibrationCenters==null||manualCalibrationCenters.length!=52)return;
+  if(keyboardTestControls!=null)removeKeyboardTestControls();
+  LinearLayout p=new LinearLayout(this); p.setOrientation(LinearLayout.VERTICAL); p.setGravity(Gravity.CENTER_HORIZONTAL); p.setPadding(22,16,22,16); p.setBackgroundColor(Color.parseColor("#EE111111"));
+  TextView t=new TextView(this); t.setText("🧪 TEST TASTIERA"); t.setTextColor(Color.WHITE); t.setTextSize(19); t.setGravity(Gravity.CENTER); p.addView(t,new LinearLayout.LayoutParams(-1,-2));
+  TextView m=new TextView(this); m.setText("CodyCross è pronto.\nPremi AVVIA TEST per digitare A-Z lentamente."); m.setTextColor(Color.WHITE); m.setTextSize(15); m.setGravity(Gravity.CENTER); m.setPadding(0,10,0,12); p.addView(m,new LinearLayout.LayoutParams(-1,-2));
+  LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER);
+  Button start=new Button(this); start.setText("▶ AVVIA TEST"); Button cancel=new Button(this); cancel.setText("ANNULLA");
+  start.setOnClickListener(v->{removeKeyboardTestControls();startKeyboardTest();}); cancel.setOnClickListener(v->{keyboardTestArmed=false;removeKeyboardTestControls();restoreMainScanOverlay();});
+  r.addView(start); r.addView(cancel); p.addView(r); keyboardTestControls=p;
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(getResources().getDisplayMetrics().widthPixels*.92f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=95;
+  try{windowManager.addView(keyboardTestControls,q);}catch(Exception e){keyboardTestControls=null;restoreMainScanOverlay();updateOverlayText("❌ Errore test tastiera: "+e.getClass().getSimpleName());}
+ }
+ private void startKeyboardTest(){
+  stopCompilation();
+  if(manualCalibrationCenters==null||manualCalibrationCenters.length!=52){restoreMainScanOverlay();return;}
+  keyboardTestRunning=true; keyboardTestPaused=false; keyboardTestIndex=0; calibratedCenters=manualCalibrationCenters.clone(); showKeyboardTestControls(); scheduleKeyboardTestKey(300);
+ }
+ private void runKeyboardTest(){startKeyboardTest();}
+ private void showKeyboardTestControls(){
+  if(keyboardTestControls!=null)removeKeyboardTestControls();
+  LinearLayout p=new LinearLayout(this); p.setOrientation(LinearLayout.VERTICAL); p.setGravity(Gravity.CENTER_HORIZONTAL); p.setPadding(18,12,18,12); p.setBackgroundColor(Color.parseColor("#EE111111"));
+  keyboardTestStatus=new TextView(this); keyboardTestStatus.setText("🧪 TEST TASTIERA\nPreparazione..."); keyboardTestStatus.setTextColor(Color.WHITE); keyboardTestStatus.setTextSize(15); keyboardTestStatus.setGravity(Gravity.CENTER); p.addView(keyboardTestStatus,new LinearLayout.LayoutParams(-1,-2));
+  LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER);
+  Button pause=new Button(this); pause.setText("⏸ SOSPENDI"); Button resume=new Button(this); resume.setText("▶ CONTINUA"); Button stop=new Button(this); stop.setText("⏹ TERMINA");
+  pause.setOnClickListener(v->pauseKeyboardTest()); resume.setOnClickListener(v->resumeKeyboardTest()); stop.setOnClickListener(v->stopKeyboardTest()); r.addView(pause); r.addView(resume); r.addView(stop); p.addView(r);
+  keyboardTestControls=p;
+  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(getResources().getDisplayMetrics().widthPixels*.94f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
+  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=70;
+  try{windowManager.addView(keyboardTestControls,q);}catch(Exception e){keyboardTestControls=null;stopKeyboardTest();}
+ }
+ private void scheduleKeyboardTestKey(long delay){
+  if(!keyboardTestRunning||keyboardTestPaused)return;
+  if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);
+  keyboardTestAction=()->{
+   if(!keyboardTestRunning||keyboardTestPaused)return;
+   if(keyboardTestIndex>=26){finishKeyboardTest();return;}
+   final char c=calibrationLetters.charAt(keyboardTestIndex); final int n=keyboardTestIndex+1;
+   final float[] xy=calibratedKeyCenter(c,getResources().getDisplayMetrics().widthPixels,getResources().getDisplayMetrics().heightPixels);
+   if(xy==null){finishKeyboardTest();updateOverlayText("❌ Nessuna coordinata per "+c);return;}
+   if(keyboardTestStatus!=null)keyboardTestStatus.setText("🧪 TEST TASTIERA\nProssimo: "+c+" ("+n+"/26)");
+   tap(xy[0],xy[1],new GestureResultCallback(){
+    @Override public void onCompleted(GestureDescription g){if(!keyboardTestRunning)return; keyboardTestIndex++; if(keyboardTestStatus!=null)keyboardTestStatus.setText("🧪 TEST TASTIERA\nPremuto: "+c+" ("+n+"/26)"); if(keyboardTestIndex<26)scheduleKeyboardTestKey(650); else finishKeyboardTest();}
+    @Override public void onCancelled(GestureDescription g){if(keyboardTestStatus!=null)keyboardTestStatus.setText("❌ TAP ANNULLATO\nLettera: "+c+" ("+n+"/26)\nPremi CONTINUA per riprovare.");}
+   });
+  };
+  handler.postDelayed(keyboardTestAction,delay);
+ }
+ private void pauseKeyboardTest(){if(!keyboardTestRunning)return;keyboardTestPaused=true;if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);if(keyboardTestStatus!=null)keyboardTestStatus.setText("⏸ TEST SOSPESO\nRiprenderà dal prossimo tasto.");}
+ private void resumeKeyboardTest(){if(!keyboardTestRunning)return;keyboardTestPaused=false;if(keyboardTestStatus!=null)keyboardTestStatus.setText("▶ TEST RIPRESO");scheduleKeyboardTestKey(250);}
+ private void stopKeyboardTest(){keyboardTestRunning=false;keyboardTestPaused=false;if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);keyboardTestAction=null;keyboardTestArmed=false;compiling=false;pendingCompilation.clear();removeKeyboardTestControls();restoreMainScanOverlay();updateOverlayText("⏹ TEST TASTIERA TERMINATO");}
+ private void finishKeyboardTest(){keyboardTestRunning=false;keyboardTestPaused=false;if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);keyboardTestAction=null;removeKeyboardTestControls();restoreMainScanOverlay();updateOverlayText("✅ TEST TASTIERA TERMINATO\nControlla A-Z su CodyCross.");}
+ private void removeKeyboardTestControls(){if(keyboardTestControls!=null&&windowManager!=null)try{windowManager.removeView(keyboardTestControls);}catch(Exception ignored){}keyboardTestControls=null;keyboardTestStatus=null;}
  private void fillAnswer(String answer){stopCompilation();final String clean=answer.toUpperCase().replaceAll("[^A-Z]","");if(clean.isEmpty())return;compiling=true;currentSchemaAnswer=clean;calibratedCenters=manualCalibrationCenters!=null?manualCalibrationCenters.clone():null;updateOverlayText("🟢 COMPILAZIONE\nRISPOSTA: "+clean+"\nControllo schema calibrato...");if(!hasSchemaCalibration(clean.length())){updateOverlayText("⚠️ Nessuna calibrazione per "+clean.length()+" lettere\nCompilo tutte le posizioni.");scheduleAnswerTaps(clean,new java.util.HashSet<Integer>());return;}schemaCapturePending=true;if(!ScreenCaptureService.requestSchemaCapture(this)){schemaCapturePending=false;scheduleAnswerTaps(clean,new java.util.HashSet<Integer>());return;}handler.postDelayed(()->{if(compiling&&schemaCapturePending){schemaCapturePending=false;updateOverlayText("⚠️ Acquisizione schema non disponibile\nCompilo tutte le posizioni.");scheduleAnswerTaps(clean,new java.util.HashSet<Integer>());}},1800L);}
  private void findExistingLettersAndSchedule(Bitmap b,String clean){
   schemaCapturePending=false;
@@ -390,6 +442,13 @@ private void loadManualCalibration(){
       pendingCompilation.clear();
       calibratedCenters=null;
     }else{
+      StringBuilder pattern=new StringBuilder(),present=new StringBuilder(),missing=new StringBuilder();
+      for(int i=0;i<clean.length();i++){
+        boolean has=found.contains(i); pattern.append(has?clean.charAt(i):'_'); if(i<clean.length()-1)pattern.append(' ');
+        if(has){if(present.length()>0)present.append(' ');present.append(clean.charAt(i));}
+        else{if(missing.length()>0)missing.append(' ');missing.append(clean.charAt(i));}
+      }
+      updateOverlayText("🟢 COMPILAZIONE\nRISPOSTA: "+clean+"\nSCHEMA: "+pattern+"\nPRESENTI: "+(present.length()>0?present:"nessuna")+"\nMANCANTI: "+(missing.length()>0?missing:"nessuna"));
       scheduleAnswerTaps(clean,found);
     }
     try{source.recycle();}catch(Exception ignored){}
@@ -622,8 +681,8 @@ private void loadManualCalibration(){
  private float[] keyCenter(char c,float w,float h){String a="QWERTYUIOP",b="ASDFGHJKL",d="ZXCVBNM";int i;if((i=a.indexOf(c))>=0)return new float[]{w*(.05f+i*.10f),h*.77f};if((i=b.indexOf(c))>=0)return new float[]{w*(.10f+i*.10f),h*.855f};if((i=d.indexOf(c))>=0)return new float[]{w*(.25f+i*.10f),h*.94f};return null;}
  private void tap(float x,float y){tap(x,y,null);}
  private void tap(float x,float y,GestureResultCallback callback){Path p=new Path();p.moveTo(x,y);GestureDescription.StrokeDescription s=new GestureDescription.StrokeDescription(p,0,80);GestureDescription g=new GestureDescription.Builder().addStroke(s).build();boolean accepted=dispatchGesture(g,callback,null);if(!accepted&&advanceTestStatus!=null)advanceTestStatus.setText("❌ TAP RIFIUTATO\nIl servizio Accessibilità non ha accettato il gesto.\nVerifica che CodyBot sia attivo nelle impostazioni Accessibilità.");}
- private void stopCompilation(){for(Runnable r:pendingCompilation)handler.removeCallbacks(r);pendingCompilation.clear();compiling=false;if(statusText!=null)statusText.setText("🔴 STOP");}
+ private void stopCompilation(){for(Runnable r:pendingCompilation)handler.removeCallbacks(r);pendingCompilation.clear();compiling=false;if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);keyboardTestAction=null;if(keyboardTestRunning){keyboardTestRunning=false;keyboardTestPaused=false;removeKeyboardTestControls();restoreMainScanOverlay();}if(statusText!=null)statusText.setText("🔴 STOP");}
  private void updateOverlayText(String m){Intent i=new Intent("com.codybot.UPDATE_OVERLAY");i.setPackage(getPackageName());i.putExtra("message",m);sendBroadcast(i);}
  @Override public void onInterrupt(){}
- @Override public void onDestroy(){overlayHidden=true;stopCompilation();if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);removeAdvanceTestControls();handler.removeCallbacks(overlayChecker);if(recognizer!=null)recognizer.close();try{unregisterReceiver(overlayReceiver);}catch(Exception ignored){}removeCoordinateView();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;super.onDestroy();}
+ @Override public void onDestroy(){overlayHidden=true;stopCompilation();if(advanceTestAction!=null)handler.removeCallbacks(advanceTestAction);removeAdvanceTestControls();if(keyboardTestAction!=null)handler.removeCallbacks(keyboardTestAction);removeKeyboardTestControls();handler.removeCallbacks(overlayChecker);if(recognizer!=null)recognizer.close();try{unregisterReceiver(overlayReceiver);}catch(Exception ignored){}removeCoordinateView();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;super.onDestroy();}
 }
