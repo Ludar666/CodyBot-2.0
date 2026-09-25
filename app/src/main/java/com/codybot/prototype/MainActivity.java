@@ -262,6 +262,12 @@ private void saveImportedKeyboard(String raw){
   for(boolean ok:seen)if(!ok)throw new IllegalArgumentException();
   android.content.SharedPreferences p=getSharedPreferences("codybot_keyboard",MODE_PRIVATE);
   p.edit().putString("centers",joinKeyboardCoordinates(c)).putInt("width",getResources().getDisplayMetrics().widthPixels).putInt("height",getResources().getDisplayMetrics().heightPixels).apply();
+  // Aggiorna immediatamente anche il servizio Accessibilità: l'importazione
+  // deve diventare attiva senza dover riavviare CodyBot.
+  Intent sync=new Intent("com.codybot.IMPORT_KEYBOARD");
+  sync.setPackage(getPackageName());
+  sync.putExtra("data",raw);
+  sendBroadcast(sync);
   status.setText("✅ COORDINATE TASTIERA SALVATE\\n26/26 coordinate");
  }catch(Exception ex){
   status.setText("❌ COORDINATE NON SALVATE\\nFormato richiesto: A = X, Y ... Z = X, Y");
