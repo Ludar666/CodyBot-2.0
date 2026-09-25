@@ -87,10 +87,13 @@ public class MainActivity extends Activity {
         status.setBackground(statusBg);
         menu.addView(status,new LinearLayout.LayoutParams(-1,-2));
 
-        menu.addView(mainMenuButton("❌  CHIUDI CODYBOT","Chiudi CodyBot e torna alla schermata principale",v->closeCodyBot()));
-
         scroll.addView(menu);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+
+        Button closeButton=mainMenuButton("❌  CHIUDI CODYBOT","Chiudi CodyBot e torna alla schermata principale",v->closeCodyBot());
+        LinearLayout.LayoutParams closeLp=new LinearLayout.LayoutParams(-1,112);
+        closeLp.setMargins(0,0,0,0);
+        root.addView(closeButton,closeLp);
 
         setContentView(root);
         refreshStatus();
@@ -220,7 +223,7 @@ public class MainActivity extends Activity {
         try{finishAndRemoveTask();}catch(Exception ignored){finishAffinity();}
     }
 
-    private void editAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);EditText ex=new EditText(this);ex.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ex.setHint("X");ex.setText(String.valueOf(Math.round(p.getFloat("x",1016f))));EditText ey=new EditText(this);ey.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ey.setHint("Y");ey.setText(String.valueOf(Math.round(p.getFloat("y",1559f))));LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(30,0,30,0);box.addView(ex);box.addView(ey);new AlertDialog.Builder(this).setTitle("Coordinata avanzamento riga").setMessage("Valori predefiniti: X 1016, Y 1559").setView(box).setPositiveButton("SALVA",(d,w)->{try{float x=Float.parseFloat(ex.getText().toString()),y=Float.parseFloat(ey.getText().toString());if(x<0||y<0)throw new Exception();p.edit().putFloat("x",x).putFloat("y",y).apply();status.setText("✅ COORDINATE SALVATE\nX = "+Math.round(x)+"\nY = "+Math.round(y));}catch(Exception e){status.setText("❌ Coordinate non valide");}}).setNegativeButton("ANNULLA",null).show();}
+    private void editAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);EditText ex=new EditText(this);ex.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ex.setHint("X");ex.setText(String.valueOf(Math.round(p.getFloat("x",997f))));EditText ey=new EditText(this);ey.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);ey.setHint("Y");ey.setText(String.valueOf(Math.round(p.getFloat("y",1542f))));LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(30,0,30,0);box.addView(ex);box.addView(ey);new AlertDialog.Builder(this).setTitle("Coordinata avanzamento riga").setMessage("Valori predefiniti: X 997, Y 1542").setView(box).setPositiveButton("SALVA",(d,w)->{try{float x=Float.parseFloat(ex.getText().toString()),y=Float.parseFloat(ey.getText().toString());if(x<0||y<0)throw new Exception();p.edit().putFloat("x",x).putFloat("y",y).apply();status.setText("✅ COORDINATE SALVATE\nX = "+Math.round(x)+"\nY = "+Math.round(y));}catch(Exception e){status.setText("❌ Coordinate non valide");}}).setNegativeButton("ANNULLA",null).show();}
     private void chooseMultiRowSchemaLength(){final String[] lengths=new String[18];for(int i=0;i<18;i++)lengths[i]=String.valueOf(i+3);new AlertDialog.Builder(this).setTitle("CALIBRAZIONE SCHEMA").setSingleChoiceItems(lengths,-1,(d,w)->{int len=w+3;d.dismiss();Intent i=new Intent(this,SchemaCalibrationService.class);i.setAction(SchemaCalibrationService.ACTION_START);i.putExtra(SchemaCalibrationService.EXTRA_LENGTH,len);startService(i);status.setText("📐 CALIBRAZIONE SCHEMA AVVIATA\n\n"+len+" lettere per parola.\nIl numero di parole è variabile.");}).show();}
     private void importKeyboardCalibration(){
  EditText e=new EditText(this);
