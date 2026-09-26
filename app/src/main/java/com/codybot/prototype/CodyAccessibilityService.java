@@ -699,7 +699,7 @@ private void showSchemaTestControls(){
  Button resume=new Button(this);resume.setText("▶ CONTINUA");resume.setOnClickListener(v->resumeSchemaTest());
  Button stop=new Button(this);stop.setText("⏹ TERMINA");stop.setOnClickListener(v->stopSchemaTest());
  controls.addView(pause);controls.addView(resume);controls.addView(stop);p.addView(controls);
- Button changeRow=new Button(this);changeRow.setText("↕ CAMBIA RIGA");changeRow.setOnClickListener(v->showSchemaRowPicker());p.addView(changeRow);
+ Button startTest=new Button(this);startTest.setText("▶ AVVIA TEST");startTest.setOnClickListener(v->{schemaTestRunning=true;removeSchemaTestControls();showSchemaTestControls();startSchemaTest();});p.addView(startTest);Button changeRow=new Button(this);changeRow.setText("↕ CAMBIA RIGA");changeRow.setOnClickListener(v->showSchemaRowPicker());p.addView(changeRow);
  schemaTestControls=p;addSchemaTestView(p,70);
 }
 private void addSchemaTestView(View v,int y){
