@@ -681,26 +681,40 @@ private void showSchemaTestReadyOverlay(){
  LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setGravity(Gravity.CENTER_HORIZONTAL);p.setPadding(22,16,22,16);p.setBackgroundColor(Color.parseColor("#EE111111"));
  TextView t=new TextView(this);t.setText("🧪 TEST SCHEMA");t.setTextColor(Color.WHITE);t.setTextSize(19);t.setGravity(Gravity.CENTER);p.addView(t,new LinearLayout.LayoutParams(-1,-2));
  TextView m=new TextView(this);m.setText("CodyCross è pronto.\nScegli riga e modalità, poi premi AVVIA TEST.");m.setTextColor(Color.WHITE);m.setTextSize(15);m.setGravity(Gravity.CENTER);m.setPadding(0,10,0,12);p.addView(m,new LinearLayout.LayoutParams(-1,-2));
- Button start=new Button(this);start.setText("▶ AVVIA TEST");start.setOnClickListener(v->{removeSchemaTestControls();showSchemaTestControls();});
+ Button start=new Button(this);start.setText("▶ AVVIA TEST");start.setOnClickListener(v->{removeSchemaTestControls();showSchemaTestTypeSelection();});
  Button cancel=new Button(this);cancel.setText("ANNULLA");cancel.setOnClickListener(v->{schemaTestArmed=false;removeSchemaTestControls();schemaTestCenters=null;restoreMainScanOverlay();});
  LinearLayout rr=new LinearLayout(this);rr.setGravity(Gravity.CENTER);rr.addView(start);rr.addView(cancel);p.addView(rr);schemaTestControls=p;addSchemaTestView(p,95);
 }
 private void showSchemaTestControls(){
- if(schemaTestControls!=null)removeSchemaTestControls();schemaTestCenters=getSchemaRowCenters(schemaTestRow,schemaTestLength);
+ if(schemaTestControls!=null)removeSchemaTestControls();
  LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setGravity(Gravity.CENTER_HORIZONTAL);p.setPadding(18,12,18,12);p.setBackgroundColor(Color.parseColor("#EE111111"));
- schemaTestStatus=new TextView(this);schemaTestStatus.setText(schemaTestSummary());schemaTestStatus.setTextColor(Color.WHITE);schemaTestStatus.setTextSize(15);schemaTestStatus.setGravity(Gravity.CENTER);p.addView(schemaTestStatus,new LinearLayout.LayoutParams(-1,-2));
- LinearLayout modes=new LinearLayout(this);modes.setGravity(Gravity.CENTER);
- Button read=new Button(this);read.setText("🔎 LEGGI LETTERE");read.setOnClickListener(v->{schemaTestMode=1;refreshSchemaTestStatus();});
- Button coords=new Button(this);coords.setText("📐 COORDINATE");coords.setOnClickListener(v->{schemaTestMode=2;refreshSchemaTestStatus();});
- Button pos=new Button(this);pos.setText("👁️ POSIZIONI");pos.setOnClickListener(v->{schemaTestMode=3;refreshSchemaTestStatus();});
- modes.addView(read);modes.addView(coords);modes.addView(pos);p.addView(modes);
- LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER);
- Button pause=new Button(this);pause.setText("⏸ SOSPENDI");pause.setOnClickListener(v->pauseSchemaTest());
- Button resume=new Button(this);resume.setText("▶ CONTINUA");resume.setOnClickListener(v->resumeSchemaTest());
- Button stop=new Button(this);stop.setText("⏹ TERMINA");stop.setOnClickListener(v->stopSchemaTest());
- controls.addView(pause);controls.addView(resume);controls.addView(stop);p.addView(controls);
- Button startTest=new Button(this);startTest.setText("▶ AVVIA TEST");startTest.setOnClickListener(v->{schemaTestRunning=true;removeSchemaTestControls();showSchemaTestControls();startSchemaTest();});p.addView(startTest);Button changeRow=new Button(this);changeRow.setText("↕ CAMBIA RIGA");changeRow.setOnClickListener(v->showSchemaRowPicker());p.addView(changeRow);
+ TextView t=new TextView(this);t.setText("🧪 TEST SCHEMI\nRiga: "+schemaTestRow);t.setTextColor(Color.WHITE);t.setTextSize(18);t.setGravity(Gravity.CENTER);p.addView(t);
+ Button row=new Button(this);row.setText("↕ SELEZIONA RIGA");row.setOnClickListener(v->showSchemaRowPicker());p.addView(row);
+ Button read=new Button(this);read.setText("🔎 LEGGI LETTERE");read.setOnClickListener(v->{schemaTestMode=1;showSelectedSchemaTest();});p.addView(read);
+ Button coords=new Button(this);coords.setText("📐 CONTROLLA COORDINATE");coords.setOnClickListener(v->{schemaTestMode=2;showSelectedSchemaTest();});p.addView(coords);
+ Button pos=new Button(this);pos.setText("👁️ MOSTRA POSIZIONI");pos.setOnClickListener(v->{schemaTestMode=3;showSelectedSchemaTest();});p.addView(pos);
+ Button stop=new Button(this);stop.setText("⏹ INTERROMPI");stop.setOnClickListener(v->stopSchemaTest());p.addView(stop);
  schemaTestControls=p;addSchemaTestView(p,70);
+}
+private void showSelectedSchemaTest(){
+ if(schemaTestControls!=null)removeSchemaTestControls();
+ schemaTestCenters=getSchemaRowCenters(schemaTestRow,schemaTestLength);
+ LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setGravity(Gravity.CENTER_HORIZONTAL);p.setPadding(18,12,18,12);p.setBackgroundColor(Color.parseColor("#EE111111"));
+ String mode=schemaTestMode==1?"🔎 LEGGI LETTERE":schemaTestMode==2?"📐 CONTROLLA COORDINATE":"👁️ MOSTRA POSIZIONI";
+ TextView t=new TextView(this);t.setText("🧪 TEST SCHEMI\nRiga: "+schemaTestRow+"\n"+mode);t.setTextColor(Color.WHITE);t.setTextSize(17);t.setGravity(Gravity.CENTER);p.addView(t);
+ Button start=new Button(this);start.setText("▶ AVVIA");start.setOnClickListener(v->{schemaTestRunning=true;schemaTestPaused=false;removeSchemaTestControls();showRunningSchemaTest();startSchemaTest();});p.addView(start);
+ Button back=new Button(this);back.setText("↩ CAMBIA TEST");back.setOnClickListener(v->showSchemaTestControls());p.addView(back);
+ Button stop=new Button(this);stop.setText("⏹ INTERROMPI");stop.setOnClickListener(v->stopSchemaTest());p.addView(stop);
+ schemaTestControls=p;addSchemaTestView(p,70);
+}
+private void showRunningSchemaTest(){
+ if(schemaTestControls!=null)removeSchemaTestControls();
+ LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setGravity(Gravity.CENTER_HORIZONTAL);p.setPadding(18,12,18,12);p.setBackgroundColor(Color.parseColor("#EE111111"));
+ schemaTestStatus=new TextView(this);schemaTestStatus.setText("🧪 TEST IN ESECUZIONE\nRiga: "+schemaTestRow);schemaTestStatus.setTextColor(Color.WHITE);schemaTestStatus.setTextSize(16);schemaTestStatus.setGravity(Gravity.CENTER);p.addView(schemaTestStatus);
+ LinearLayout rr=new LinearLayout(this);rr.setGravity(Gravity.CENTER);
+ Button pause=new Button(this);pause.setText("⏸ SOSPENDI");pause.setOnClickListener(v->pauseSchemaTest());
+ Button stop=new Button(this);stop.setText("⏹ ARRESTA");stop.setOnClickListener(v->stopSchemaTest());
+ rr.addView(pause);rr.addView(stop);p.addView(rr);schemaTestControls=p;addSchemaTestView(p,70);
 }
 private void addSchemaTestView(View v,int y){
  DisplayMetrics dm=getResources().getDisplayMetrics();WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(dm.widthPixels*.96f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;q.y=y;
