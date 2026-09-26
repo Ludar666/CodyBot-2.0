@@ -39,7 +39,7 @@ import java.util.Set;
 public class CodyAccessibilityService extends AccessibilityService {
  private WindowManager windowManager; private View overlayView; private volatile boolean overlayHidden=false; private TextView statusText; private View calibrationView; private final Handler handler=new Handler(Looper.getMainLooper());
  private final List<Runnable> pendingCompilation=new ArrayList<>(); private boolean compiling=false; private static volatile String lastTargetPackage=""; private volatile boolean calibrationInProgress=false; private final String calibrationLetters="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; private int calibrationIndex=0; private float[] manualCalibrationCenters; private volatile float[] calibratedCenters; private TextRecognizer recognizer; private volatile boolean schemaCapturePending=false; private volatile String currentSchemaAnswer="";
- private volatile boolean keyboardTestArmed=false; private boolean keyboardTestRunning=false; private boolean keyboardTestPaused=false; private int keyboardTestIndex=0; private Runnable keyboardTestAction; private View keyboardTestControls; private TextView keyboardTestStatus; private volatile boolean schemaTestArmed=false; private boolean schemaTestRunning=false; private boolean schemaTestPaused=false; private int schemaTestIndex=0; private int schemaTestLength=0; private int[] schemaTestCenters; private Runnable schemaTestAction; private View schemaTestControls; private TextView schemaTestStatus;
+ private volatile boolean keyboardTestArmed=false; private boolean keyboardTestRunning=false; private boolean keyboardTestPaused=false; private int keyboardTestIndex=0; private Runnable keyboardTestAction; private View keyboardTestControls; private TextView keyboardTestStatus; private volatile boolean schemaTestArmed=false; private boolean schemaTestRunning=false; private boolean schemaTestPaused=false; private int schemaTestIndex=0; private int schemaTestLength=0; private int schemaTestRow=1; private int[] schemaTestCenters; private Runnable schemaTestAction; private View schemaTestControls; private TextView schemaTestStatus; private int schemaTestMode=0; private View schemaPositionOverlay; private boolean schemaTestCapturePending=false;
  private static final float DEFAULT_ADVANCE_X=997f;
  private static final float DEFAULT_ADVANCE_Y=1542f;
  private float advanceX=DEFAULT_ADVANCE_X, advanceY=DEFAULT_ADVANCE_Y;
@@ -81,19 +81,11 @@ private void hideMainScanOverlay(){overlayHidden=true;handler.removeCallbacks(ov
   }catch(Exception e){updateOverlayText("❌ Importazione tastiera non valida\nServono le 26 righe A = x, y ... Z = x, y.");}
  }
  private void importSchemaCalibration(String raw){
-  if(raw!=null&&raw.trim().startsWith("CODYBOT_SCHEMA_V3|")){try{String[] lines=raw.trim().split("\\r?\\n");int cols=Integer.parseInt(lines[0].substring(lines[0].indexOf("|")+1).trim());for(String line:lines){String t=line.trim();if(t.startsWith("ROW|1|")){String[] cells=t.split("\\|",3)[2].split(";");if(cells.length!=cols)throw new IllegalArgumentException();StringBuilder out=new StringBuilder();for(String cell:cells){String[] xy=cell.trim().split(",");if(xy.length!=2)throw new IllegalArgumentException();if(out.length()>0)out.append(",");out.append(Integer.parseInt(xy[0].trim())).append(",").append(Integer.parseInt(xy[1].trim()));}getSharedPreferences("codybot_schema",MODE_PRIVATE).edit().putString("centers_"+cols,out.toString()).apply();updateOverlayText("✅ SCHEMA V3 IMPORTATO");return;}}throw new IllegalArgumentException();}catch(Exception e){updateOverlayText("❌ Importazione schema V3 non valida");return;}}
-  if(raw==null||raw.trim().isEmpty()){updateOverlayText("❌ Importazione schemi: dati vuoti");return;}
-  try{
-    String[] lines=raw.split("\\r?\\n");int len=0;int[] centers=null;int count=0;
-    for(String line:lines){String t=line.trim();
-      if(t.matches("\\d+ lettere - Schermo .*")){if(len>0&&centers!=null&&count==len)saveSchemaCalibration(len,centers,getResources().getDisplayMetrics().widthPixels,getResources().getDisplayMetrics().heightPixels);len=Integer.parseInt(t.split(" ")[0]);centers=new int[len*2];count=0;}
-      else if(len>0&&t.matches("\\d+ = -?\\d+, -?\\d+")){String[] sides=t.split("=",2);int pos=Integer.parseInt(sides[0].trim())-1;String[] xy=sides[1].trim().split(",");if(pos>=0&&pos<len){centers[pos*2]=Integer.parseInt(xy[0].trim());centers[pos*2+1]=Integer.parseInt(xy[1].trim());count++;}}
-    }
-    if(len>0&&centers!=null&&count==len)saveSchemaCalibration(len,centers,getResources().getDisplayMetrics().widthPixels,getResources().getDisplayMetrics().heightPixels);else throw new IllegalArgumentException();
-    updateOverlayText("✅ CALIBRAZIONI SCHEMA IMPORTATE");
-  }catch(Exception e){updateOverlayText("❌ Importazione schemi non valida\nUsa il testo prodotto da ESPORTA SCHEMA.");}
- }
-
+ if(raw!=null&&raw.trim().startsWith("CODYBOT_SCHEMA_V3|")){try{String[] lines=raw.trim().split("\\r?\\n");int cols=Integer.parseInt(lines[0].substring(lines[0].indexOf("|")+1).trim());android.content.SharedPreferences.Editor ed=getSharedPreferences("codybot_schema",MODE_PRIVATE).edit();int imported=0;for(String line:lines){String t=line.trim();if(!t.startsWith("ROW|"))continue;String[] parts=t.split("\\|",3);if(parts.length!=3)continue;int row=Integer.parseInt(parts[1].trim());String[] cells=parts[2].split(";");if(cells.length!=cols)throw new IllegalArgumentException();StringBuilder out=new StringBuilder();for(String cell:cells){String[] xy=cell.trim().split(",");if(xy.length!=2)throw new IllegalArgumentException();if(out.length()>0)out.append(",");out.append(Integer.parseInt(xy[0].trim())).append(",").append(Integer.parseInt(xy[1].trim()));}ed.putString("row_"+row+"_"+cols,out.toString());if(row==1)ed.putString("centers_"+cols,out.toString());imported++;}if(imported==0)throw new IllegalArgumentException();ed.putInt("rows_"+cols,imported).apply();updateOverlayText("✅ SCHEMA V3 IMPORTATO\n"+imported+" righe / "+cols+" celle");return;}catch(Exception e){updateOverlayText("❌ Importazione schema V3 non valida");return;}}
+ if(raw==null||raw.trim().isEmpty()){updateOverlayText("❌ Importazione schemi: dati vuoti");return;}try{String[] lines=raw.split("\\r?\\n");int len=0;int[] centers=null;int count=0;for(String line:lines){String t=line.trim();if(t.matches("\\d+ lettere - Schermo .*")){if(len>0&&centers!=null&&count==len)saveSchemaCalibration(len,centers,getResources().getDisplayMetrics().widthPixels,getResources().getDisplayMetrics().heightPixels);len=Integer.parseInt(t.split(" ")[0]);centers=new int[len*2];count=0;}else if(len>0&&t.matches("\\d+ = -?\\d+, -?\\d+")){String[] sides=t.split("=",2);int pos=Integer.parseInt(sides[0].trim())-1;String[] xy=sides[1].trim().split(",");if(pos>=0&&pos<len){centers[pos*2]=Integer.parseInt(xy[0].trim());centers[pos*2+1]=Integer.parseInt(xy[1].trim());count++;}}}if(len>0&&centers!=null&&count==len)saveSchemaCalibration(len,centers,getResources().getDisplayMetrics().widthPixels,getResources().getDisplayMetrics().heightPixels);else throw new IllegalArgumentException();updateOverlayText("✅ CALIBRAZIONI SCHEMA IMPORTATE");}catch(Exception e){updateOverlayText("❌ Importazione schemi non valida\nUsa il testo prodotto da ESPORTA SCHEMA.");}}
+ private int[] getSchemaRowCenters(int row,int length){if(row<1||length<1)return null;android.content.SharedPreferences p=getSharedPreferences("codybot_schema",MODE_PRIVATE);String raw=p.getString("row_"+row+"_"+length,null);if(raw==null&&row==1)raw=p.getString("centers_"+length,null);if(raw==null)return null;String[] a=raw.split(",");if(a.length!=length*2)return null;try{int[] c=new int[a.length];for(int i=0;i<a.length;i++)c[i]=Integer.parseInt(a[i].trim());return c;}catch(Exception e){return null;}}
+ private void analyzeSchemaTestRow(Bitmap b){final int[] c=schemaTestCenters;if(c==null){try{b.recycle();}catch(Exception ignored){}schemaTestStatus.setText("❌ Nessuna coordinata per riga "+schemaTestRow);return;}final int half=38;final StringBuilder out=new StringBuilder("🔎 RIGA ").append(schemaTestRow).append("\n");analyzeSchemaTestCell(b,c,0,half,out,()->{schemaTestStatus.setText(out.toString());try{b.recycle();}catch(Exception ignored){}});}
+ private void analyzeSchemaTestCell(Bitmap b,int[] c,int i,int half,StringBuilder out,Runnable done){if(i>=c.length/2){done.run();return;}int cx=c[i*2],cy=c[i*2+1],l=Math.max(0,cx-half),t=Math.max(0,cy-half),r=Math.min(b.getWidth(),cx+half),bt=Math.min(b.getHeight(),cy+half);if(r<=l||bt<=t){out.append(i+1).append(": ?  ");analyzeSchemaTestCell(b,c,i+1,half,out,done);return;}Bitmap cell=Bitmap.createBitmap(b,l,t,r-l,bt-t);recognizer.process(InputImage.fromBitmap(cell,0)).addOnSuccessListener(res->{String best="_";float bestConf=0f;for(Text.TextBlock block:res.getTextBlocks())for(Text.Line line:block.getLines())for(Text.Element el:line.getElements()){String raw=el.getText()==null?"":el.getText().trim().toUpperCase().replaceAll("[^A-Z]","");Float conf=el.getConfidence();if(raw.length()==1&&(conf==null||conf>=0.55f)&&(!raw.equals(best)||(conf!=null&&conf>bestConf))){best=raw;bestConf=conf==null?0:conf;}}out.append(i+1).append(": ").append(best);if(!best.equals("_"))out.append(" (").append(String.format(java.util.Locale.US,"%.2f",bestConf)).append(")");out.append("  ");try{cell.recycle();}catch(Exception ignored){}analyzeSchemaTestCell(b,c,i+1,half,out,done);}).addOnFailureListener(e->{out.append(i+1).append(": ?  ");try{cell.recycle();}catch(Exception ignored){}analyzeSchemaTestCell(b,c,i+1,half,out,done);});}
  private void loadAdvancePoint(){android.content.SharedPreferences p=getSharedPreferences("codybot_advance",MODE_PRIVATE);advanceX=p.getFloat("x",DEFAULT_ADVANCE_X);advanceY=p.getFloat("y",DEFAULT_ADVANCE_Y);}
  private void saveAdvancePoint(float x,float y){advanceX=x;advanceY=y;getSharedPreferences("codybot_advance",MODE_PRIVATE).edit().putFloat("x",x).putFloat("y",y).apply();}
  private void testAdvancePoint(){
@@ -681,138 +673,64 @@ private void loadManualCalibration(){
  private int[] getSchemaCenters(int length){String raw=getSharedPreferences("codybot_schema",MODE_PRIVATE).getString("centers_"+length,null);if(raw==null&&length==9)raw="83,422,212,406,321,428,438,419,550,415,656,414,778,418,879,424,1009,422";if(raw==null)return null;String[] p=raw.split(",");if(p.length!=length*2)return null;try{int[] c=new int[p.length];for(int i=0;i<p.length;i++)c[i]=Integer.parseInt(p[i].trim());return c;}catch(Exception e){return null;}}
  private boolean hasSchemaCalibration(int length){return getSchemaCenters(length)!=null;}
  private void testSchemaCalibration(int length){
-  stopCompilation();
-  hideMainScanOverlay();
-  int[] c=getSchemaCenters(length);
-  if(c==null){
-    restoreMainScanOverlay();
-    updateOverlayText("⚠️ Nessuna calibrazione per "+length+" lettere");
-    return;
-  }
-  schemaTestLength=length;
-  schemaTestCenters=c.clone();
-  schemaTestArmed=true;
-  updateOverlayText("🧪 TEST SCHEMA PRONTO\nPassa a CodyCross.\nQuando CodyCross è visibile comparirà AVVIA TEST.");
+ stopCompilation();hideMainScanOverlay();schemaTestLength=length;schemaTestRow=1;schemaTestMode=0;schemaTestCenters=getSchemaRowCenters(1,length);schemaTestArmed=true;
+ updateOverlayText("🧪 TEST SCHEMA PRONTO\nPassa a CodyCross.\nIl pannello comparirà quando CodyCross è visibile.");
 }
 private void showSchemaTestReadyOverlay(){
-  if(!Settings.canDrawOverlays(this)||schemaTestCenters==null)return;
-  if(schemaTestControls!=null)removeSchemaTestControls();
-  LinearLayout p=new LinearLayout(this);
-  p.setOrientation(LinearLayout.VERTICAL);
-  p.setGravity(Gravity.CENTER_HORIZONTAL);
-  p.setPadding(22,16,22,16);
-  p.setBackgroundColor(Color.parseColor("#EE111111"));
-  TextView t=new TextView(this);
-  t.setText("🧪 TEST SCHEMA");
-  t.setTextColor(Color.WHITE); t.setTextSize(19); t.setGravity(Gravity.CENTER);
-  p.addView(t,new LinearLayout.LayoutParams(-1,-2));
-  TextView m=new TextView(this);
-  m.setText("CodyCross è pronto.\nPremi AVVIA TEST per verificare le posizioni dello schema.");
-  m.setTextColor(Color.WHITE); m.setTextSize(15); m.setGravity(Gravity.CENTER); m.setPadding(0,10,0,12);
-  p.addView(m,new LinearLayout.LayoutParams(-1,-2));
-  LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER);
-  Button start=new Button(this); start.setText("▶ AVVIA TEST");
-  Button cancel=new Button(this); cancel.setText("ANNULLA");
-  start.setOnClickListener(v->{removeSchemaTestControls();startSchemaTest();});
-  cancel.setOnClickListener(v->{schemaTestArmed=false;removeSchemaTestControls();schemaTestCenters=null;restoreMainScanOverlay();});
-  row.addView(start); row.addView(cancel); p.addView(row);
-  schemaTestControls=p;
-  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(getResources().getDisplayMetrics().widthPixels*.92f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
-  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=95;
-  try{windowManager.addView(schemaTestControls,q);}
-  catch(Exception e){schemaTestControls=null;restoreMainScanOverlay();updateOverlayText("❌ Errore test schema: "+e.getClass().getSimpleName());}
-}
-private void startSchemaTest(){
-  stopCompilation();
-  if(schemaTestCenters==null||schemaTestLength<1){restoreMainScanOverlay();return;}
-  schemaTestRunning=true; schemaTestPaused=false; schemaTestIndex=0;
-  showSchemaTestControls();
-  scheduleSchemaTestPosition(300);
+ if(!Settings.canDrawOverlays(this))return;if(schemaTestControls!=null)removeSchemaTestControls();
+ LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setGravity(Gravity.CENTER_HORIZONTAL);p.setPadding(22,16,22,16);p.setBackgroundColor(Color.parseColor("#EE111111"));
+ TextView t=new TextView(this);t.setText("🧪 TEST SCHEMA");t.setTextColor(Color.WHITE);t.setTextSize(19);t.setGravity(Gravity.CENTER);p.addView(t,new LinearLayout.LayoutParams(-1,-2));
+ TextView m=new TextView(this);m.setText("CodyCross è pronto.\nScegli riga e modalità, poi premi AVVIA TEST.");m.setTextColor(Color.WHITE);m.setTextSize(15);m.setGravity(Gravity.CENTER);m.setPadding(0,10,0,12);p.addView(m,new LinearLayout.LayoutParams(-1,-2));
+ Button start=new Button(this);start.setText("▶ AVVIA TEST");start.setOnClickListener(v->{removeSchemaTestControls();showSchemaTestControls();});
+ Button cancel=new Button(this);cancel.setText("ANNULLA");cancel.setOnClickListener(v->{schemaTestArmed=false;removeSchemaTestControls();schemaTestCenters=null;restoreMainScanOverlay();});
+ LinearLayout rr=new LinearLayout(this);rr.setGravity(Gravity.CENTER);rr.addView(start);rr.addView(cancel);p.addView(rr);schemaTestControls=p;addSchemaTestView(p,95);
 }
 private void showSchemaTestControls(){
-  if(schemaTestControls!=null)removeSchemaTestControls();
-  LinearLayout p=new LinearLayout(this);
-  p.setOrientation(LinearLayout.VERTICAL); p.setGravity(Gravity.CENTER_HORIZONTAL);
-  p.setPadding(18,12,18,12); p.setBackgroundColor(Color.parseColor("#EE111111"));
-  schemaTestStatus=new TextView(this);
-  schemaTestStatus.setText("🧪 TEST SCHEMA\nPreparazione...");
-  schemaTestStatus.setTextColor(Color.WHITE); schemaTestStatus.setTextSize(15); schemaTestStatus.setGravity(Gravity.CENTER);
-  p.addView(schemaTestStatus,new LinearLayout.LayoutParams(-1,-2));
-  LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER);
-  Button pause=new Button(this); pause.setText("⏸ SOSPENDI");
-  Button resume=new Button(this); resume.setText("▶ CONTINUA");
-  Button stop=new Button(this); stop.setText("⏹ TERMINA");
-  pause.setOnClickListener(v->pauseSchemaTest());
-  resume.setOnClickListener(v->resumeSchemaTest());
-  stop.setOnClickListener(v->stopSchemaTest());
-  row.addView(pause); row.addView(resume); row.addView(stop); p.addView(row);
-  schemaTestControls=p;
-  WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(getResources().getDisplayMetrics().widthPixels*.94f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
-  q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; q.y=70;
-  try{windowManager.addView(schemaTestControls,q);}
-  catch(Exception e){schemaTestControls=null;stopSchemaTest();}
+ if(schemaTestControls!=null)removeSchemaTestControls();schemaTestCenters=getSchemaRowCenters(schemaTestRow,schemaTestLength);
+ LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setGravity(Gravity.CENTER_HORIZONTAL);p.setPadding(18,12,18,12);p.setBackgroundColor(Color.parseColor("#EE111111"));
+ schemaTestStatus=new TextView(this);schemaTestStatus.setText(schemaTestSummary());schemaTestStatus.setTextColor(Color.WHITE);schemaTestStatus.setTextSize(15);schemaTestStatus.setGravity(Gravity.CENTER);p.addView(schemaTestStatus,new LinearLayout.LayoutParams(-1,-2));
+ LinearLayout modes=new LinearLayout(this);modes.setGravity(Gravity.CENTER);
+ Button read=new Button(this);read.setText("🔎 LEGGI LETTERE");read.setOnClickListener(v->{schemaTestMode=1;refreshSchemaTestStatus();});
+ Button coords=new Button(this);coords.setText("📐 COORDINATE");coords.setOnClickListener(v->{schemaTestMode=2;refreshSchemaTestStatus();});
+ Button pos=new Button(this);pos.setText("👁️ POSIZIONI");pos.setOnClickListener(v->{schemaTestMode=3;refreshSchemaTestStatus();});
+ modes.addView(read);modes.addView(coords);modes.addView(pos);p.addView(modes);
+ LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER);
+ Button pause=new Button(this);pause.setText("⏸ SOSPENDI");pause.setOnClickListener(v->pauseSchemaTest());
+ Button resume=new Button(this);resume.setText("▶ CONTINUA");resume.setOnClickListener(v->resumeSchemaTest());
+ Button stop=new Button(this);stop.setText("⏹ TERMINA");stop.setOnClickListener(v->stopSchemaTest());
+ controls.addView(pause);controls.addView(resume);controls.addView(stop);p.addView(controls);
+ Button changeRow=new Button(this);changeRow.setText("↕ CAMBIA RIGA");changeRow.setOnClickListener(v->showSchemaRowPicker());p.addView(changeRow);
+ schemaTestControls=p;addSchemaTestView(p,70);
 }
-private void scheduleSchemaTestPosition(long delay){
-  if(!schemaTestRunning||schemaTestPaused)return;
-  if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
-  schemaTestAction=()->{
-    if(!schemaTestRunning||schemaTestPaused)return;
-    if(schemaTestIndex>=schemaTestLength){finishSchemaTest();return;}
-    final int n=schemaTestIndex+1;
-    final int x=schemaTestCenters[schemaTestIndex*2], y=schemaTestCenters[schemaTestIndex*2+1];
-    if(schemaTestStatus!=null)schemaTestStatus.setText("🧪 TEST SCHEMA\nProssima posizione: "+n+"/"+schemaTestLength);
-    tap(x,y,new GestureResultCallback(){
-      @Override public void onCompleted(GestureDescription g){
-        if(!schemaTestRunning)return;
-        schemaTestIndex++;
-        if(schemaTestStatus!=null)schemaTestStatus.setText("🧪 TEST SCHEMA\nPosizione "+n+"/"+schemaTestLength);
-        if(schemaTestIndex<schemaTestLength)scheduleSchemaTestPosition(650); else finishSchemaTest();
-      }
-      @Override public void onCancelled(GestureDescription g){
-        if(schemaTestStatus!=null)schemaTestStatus.setText("❌ TAP ANNULLATO\nPosizione "+n+"/"+schemaTestLength+"\nPremi CONTINUA per riprovare.");
-      }
-    });
-  };
-  handler.postDelayed(schemaTestAction,delay);
+private void addSchemaTestView(View v,int y){
+ DisplayMetrics dm=getResources().getDisplayMetrics();WindowManager.LayoutParams q=new WindowManager.LayoutParams((int)(dm.widthPixels*.96f),-2,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);q.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;q.y=y;
+ try{windowManager.addView(v,q);}catch(Exception e){schemaTestControls=null;restoreMainScanOverlay();updateOverlayText("❌ Errore test schema: "+e.getClass().getSimpleName());}
 }
-private void pauseSchemaTest(){
-  if(!schemaTestRunning)return;
-  schemaTestPaused=true;
-  if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
-  if(schemaTestStatus!=null)schemaTestStatus.setText("⏸ TEST SOSPESO\nPremi CONTINUA per riprendere.");
+private void showSchemaRowPicker(){
+ LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setGravity(Gravity.CENTER_HORIZONTAL);box.setPadding(14,8,14,8);box.setBackgroundColor(Color.parseColor("#EE111111"));
+ TextView title=new TextView(this);title.setText("📐 SELEZIONA LA RIGA");title.setTextColor(Color.WHITE);title.setTextSize(17);title.setGravity(Gravity.CENTER);box.addView(title);
+ for(int base=1;base<=30;base+=5){LinearLayout rr=new LinearLayout(this);rr.setGravity(Gravity.CENTER);for(int j=0;j<5&&base+j<=30;j++){final int row=base+j;Button b=new Button(this);b.setText(""+row);b.setOnClickListener(v->{schemaTestRow=row;schemaTestCenters=getSchemaRowCenters(row,schemaTestLength);removeSchemaTestControls();showSchemaTestControls();});rr.addView(b);}box.addView(rr);}
+ Button back=new Button(this);back.setText("INDIETRO");back.setOnClickListener(v->{removeSchemaTestControls();showSchemaTestControls();});box.addView(back);removeSchemaTestControls();schemaTestControls=box;addSchemaTestView(box,70);
 }
-private void resumeSchemaTest(){
-  if(!schemaTestRunning)return;
-  schemaTestPaused=false;
-  if(schemaTestStatus!=null)schemaTestStatus.setText("▶ TEST RIPRESO");
-  scheduleSchemaTestPosition(250);
-}
-private void stopSchemaTest(){
-  schemaTestRunning=false; schemaTestPaused=false; schemaTestArmed=false;
-  if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
-  schemaTestAction=null; schemaTestCenters=null; pendingCompilation.clear();
-  removeSchemaTestControls(); restoreMainScanOverlay();
-  updateOverlayText("⏹ TEST SCHEMA TERMINATO");
-}
-private void finishSchemaTest(){
-  schemaTestRunning=false; schemaTestPaused=false;
-  if(schemaTestAction!=null)handler.removeCallbacks(schemaTestAction);
-  schemaTestAction=null; schemaTestCenters=null;
-  removeSchemaTestControls(); restoreMainScanOverlay();
-  updateOverlayText("✅ TEST SCHEMA TERMINATO\nControlla le posizioni su CodyCross.");
-}
-private void removeSchemaTestControls(){
-  if(schemaTestControls!=null&&windowManager!=null)try{windowManager.removeView(schemaTestControls);}catch(Exception ignored){}
-  schemaTestControls=null; schemaTestStatus=null;
-}
-
+private String schemaTestSummary(){String mode=schemaTestMode==1?"🔎 LEGGI LETTERE":schemaTestMode==2?"📐 CONTROLLA COORDINATE":schemaTestMode==3?"👁️ MOSTRA POSIZIONI":"Seleziona una modalità";return "🧪 TEST SCHEMA\nRiga: "+schemaTestRow+" / "+schemaTestLength+" celle\nModalità: "+mode;}
+private void refreshSchemaTestStatus(){if(schemaTestStatus!=null)schemaTestStatus.setText(schemaTestSummary());}
+private void startSchemaTest(){stopCompilation();schemaTestRunning=true;schemaTestPaused=false;if(schemaTestMode==1)runSchemaRead();else if(schemaTestMode==2)runSchemaCoordinateCheck();else if(schemaTestMode==3)runSchemaPositionOverlay();else refreshSchemaTestStatus();}
+private void runSchemaRead(){schemaTestCapturePending=true;refreshSchemaTestStatus();if(!ScreenCaptureService.requestSchemaCapture(this)){schemaTestCapturePending=false;if(schemaTestStatus!=null)schemaTestStatus.setText("❌ Cattura schermo non disponibile");return;}handler.postDelayed(()->{if(schemaTestRunning&&schemaTestCapturePending){schemaTestCapturePending=false;if(schemaTestStatus!=null)schemaTestStatus.setText("❌ Acquisizione non disponibile\nPremi CONTINUA per riprovare.");}},1800);}
+private void runSchemaCoordinateCheck(){int[] c=schemaTestCenters;if(c==null){schemaTestStatus.setText("❌ Nessuna coordinata per riga "+schemaTestRow);return;}int minDx=Integer.MAX_VALUE,maxDx=0,n=0;double sum=0;for(int i=1;i<c.length/2;i++){int d=c[i*2]-c[(i-1)*2];minDx=Math.min(minDx,d);maxDx=Math.max(maxDx,d);sum+=d;n++;}double avg=n>0?sum/n:0;int yMin=c[1],yMax=c[1];for(int i=1;i<c.length/2;i++){yMin=Math.min(yMin,c[i*2+1]);yMax=Math.max(yMax,c[i*2+1]);}String msg="📐 RIGA "+schemaTestRow+"\nX: "+c[0]+" → "+c[c.length-2]+"\nPasso medio: "+String.format(java.util.Locale.US,"%.1f",avg)+" px\nPasso min/max: "+minDx+" / "+maxDx+" px\nY: "+yMin+"–"+yMax+" px";msg+=(Math.abs(maxDx-minDx)<=4&&yMax-yMin<=4)?"\n✅ GEOMETRIA REGOLARE":"\n⚠️ VERIFICARE COORDINATE";schemaTestStatus.setText(msg);}
+private void runSchemaPositionOverlay(){removeSchemaPositionOverlay();if(schemaTestCenters==null){schemaTestStatus.setText("❌ Nessuna coordinata per riga "+schemaTestRow);return;}FrameLayout p=new FrameLayout(this);for(int i=0;i<schemaTestCenters.length/2;i++){TextView n=new TextView(this);n.setText(""+(i+1));n.setTextColor(Color.WHITE);n.setTextSize(16);n.setGravity(Gravity.CENTER);n.setBackgroundColor(Color.parseColor("#CC000000"));FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(52,52);lp.leftMargin=schemaTestCenters[i*2]-26;lp.topMargin=schemaTestCenters[i*2+1]-26;p.addView(n,lp);}schemaPositionOverlay=p;DisplayMetrics dm=getResources().getDisplayMetrics();WindowManager.LayoutParams q=new WindowManager.LayoutParams(dm.widthPixels,dm.heightPixels,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);q.gravity=Gravity.TOP|Gravity.START;try{windowManager.addView(schemaPositionOverlay,q);schemaTestStatus.setText("👁️ POSIZIONI\nRiga "+schemaTestRow+" visualizzata");}catch(Exception e){schemaPositionOverlay=null;schemaTestStatus.setText("❌ Errore visualizzazione");}}
+private void removeSchemaPositionOverlay(){if(schemaPositionOverlay!=null&&windowManager!=null)try{windowManager.removeView(schemaPositionOverlay);}catch(Exception ignored){}schemaPositionOverlay=null;}
+private void pauseSchemaTest(){if(!schemaTestRunning)return;schemaTestPaused=true;schemaTestCapturePending=false;removeSchemaPositionOverlay();removeSchemaTestControls();LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setGravity(Gravity.CENTER_HORIZONTAL);p.setPadding(18,12,18,12);p.setBackgroundColor(Color.parseColor("#EE111111"));TextView t=new TextView(this);t.setText("⏸ TEST SCHEMA SOSPESO\nRiga: "+schemaTestRow+"\nModalità: "+(schemaTestMode==1?"LEGGI LETTERE":schemaTestMode==2?"CONTROLLA COORDINATE":"MOSTRA POSIZIONI"));t.setTextColor(Color.WHITE);t.setTextSize(15);t.setGravity(Gravity.CENTER);p.addView(t);LinearLayout r=new LinearLayout(this);r.setGravity(Gravity.CENTER);Button row=new Button(this);row.setText("↕ CAMBIA RIGA");row.setOnClickListener(v->showSchemaRowPicker());Button mode=new Button(this);mode.setText("🔄 CAMBIA MODALITÀ");mode.setOnClickListener(v->{removeSchemaTestControls();showSchemaTestControls();});r.addView(row);r.addView(mode);p.addView(r);LinearLayout r2=new LinearLayout(this);r2.setGravity(Gravity.CENTER);Button cont=new Button(this);cont.setText("▶ CONTINUA");cont.setOnClickListener(v->{removeSchemaTestControls();showSchemaTestControls();resumeSchemaTest();});Button stop=new Button(this);stop.setText("⏹ TERMINA");stop.setOnClickListener(v->stopSchemaTest());r2.addView(cont);r2.addView(stop);p.addView(r2);schemaTestControls=p;addSchemaTestView(p,70);}
+private void resumeSchemaTest(){if(!schemaTestRunning)return;schemaTestPaused=false;showSchemaTestControls();if(schemaTestMode==1)runSchemaRead();else if(schemaTestMode==2)runSchemaCoordinateCheck();else if(schemaTestMode==3)runSchemaPositionOverlay();}
+private void stopSchemaTest(){schemaTestRunning=false;schemaTestPaused=false;schemaTestArmed=false;schemaTestCapturePending=false;removeSchemaPositionOverlay();schemaTestCenters=null;removeSchemaTestControls();restoreMainScanOverlay();updateOverlayText("⏹ TEST SCHEMA TERMINATO");}
+private void removeSchemaTestControls(){if(schemaTestControls!=null&&windowManager!=null)try{windowManager.removeView(schemaTestControls);}catch(Exception ignored){}schemaTestControls=null;schemaTestStatus=null;}
  private void exportSchemaCalibration(){StringBuilder sb=new StringBuilder("CodyBot - Calibrazione schema\n\n");boolean any=false;for(int length=1;length<=20;length++){int[] c=getSchemaCenters(length);if(c==null)continue;any=true;int w=getSharedPreferences("codybot_schema",MODE_PRIVATE).getInt("width_"+length,0),h=getSharedPreferences("codybot_schema",MODE_PRIVATE).getInt("height_"+length,0);sb.append(length).append(" lettere - Schermo ").append(w).append(" x ").append(h).append("\n");for(int i=0;i<length;i++)sb.append(i+1).append(" = ").append(c[i*2]).append(", ").append(c[i*2+1]).append("\n");sb.append("\n");}if(!any){new android.app.AlertDialog.Builder(this).setTitle("Calibrazione schema").setMessage("Nessuna calibrazione salvata.").setPositiveButton("OK",null).show();return;}final String out=sb.toString();new android.app.AlertDialog.Builder(this).setTitle("Calibrazione schema").setMessage(out).setPositiveButton("COPIA",(d,w)->{android.content.ClipboardManager cb=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cb.setPrimaryClip(android.content.ClipData.newPlainText("CodyBot schema",out));updateOverlayText("✅ CALIBRAZIONE SCHEMA COPIATA");}).setNegativeButton("CHIUDI",null).show();}
 
  public void handleSchemaBitmap(Bitmap bitmap){
-  if(bitmap==null){schemaCapturePending=false;return;}
-  if(!compiling){try{bitmap.recycle();}catch(Exception ignored){}schemaCapturePending=false;return;}
-  findExistingLettersAndSchedule(bitmap,currentSchemaAnswer);
- }
+ if(bitmap==null){schemaCapturePending=false;schemaTestCapturePending=false;return;}
+ if(schemaTestCapturePending||(schemaTestRunning&&schemaTestMode==1)){schemaTestCapturePending=false;analyzeSchemaTestRow(bitmap);return;}
+ if(!compiling){try{bitmap.recycle();}catch(Exception ignored){}schemaCapturePending=false;return;}
+ findExistingLettersAndSchedule(bitmap,currentSchemaAnswer);
+}
  private void hideOverlay(){overlayHidden=true;stopCompilation();handler.removeCallbacks(overlayChecker);removeCalibrationOverlay();if(overlayView!=null&&windowManager!=null)try{windowManager.removeView(overlayView);}catch(Exception ignored){}overlayView=null;statusText=null;try{stopService(new Intent(this,ScreenCaptureService.class));}catch(Exception ignored){}handler.postDelayed(()->{try{disableSelf();}catch(Exception ignored){}},150);}
  private java.util.Set<Integer> alignDetectedLetters(String clean,java.util.List<Character> detected){java.util.Set<Integer> matched=new java.util.HashSet<Integer>();if(detected==null||detected.isEmpty())return matched;int n=clean.length(),m=detected.size();int[][] dp=new int[n+1][m+1];for(int i=1;i<=n;i++)for(int j=1;j<=m;j++){int best=Math.max(dp[i-1][j],dp[i][j-1]);if(clean.charAt(i-1)==detected.get(j-1))best=Math.max(best,dp[i-1][j-1]+1);dp[i][j]=best;}int i=n,j=m;while(i>0&&j>0){if(clean.charAt(i-1)==detected.get(j-1)&&dp[i][j]==dp[i-1][j-1]+1){matched.add(i-1);i--;j--;}else if(dp[i-1][j]>=dp[i][j-1])i--;else j--;}return matched;}
  private void scheduleAnswerTaps(String clean,java.util.Set<Integer> existing){if(!compiling)return;DisplayMetrics dm=getResources().getDisplayMetrics();float w=dm.widthPixels,h=dm.heightPixels;int index=0,skipped=0;for(int i=0;i<clean.length();i++){if(existing.contains(i)){skipped++;continue;}final char c=clean.charAt(i);final float[] xy=calibratedKeyCenter(c,w,h);if(xy==null){updateOverlayText("⚠️ Nessuna coordinata calibrata per "+c+"\nEsegui CALIBRA TASTIERA prima di compilare.");compiling=false;pendingCompilation.clear();calibratedCenters=null;return;}final long d=index*240L;index++;Runnable r=()->{if(compiling&&ScreenCaptureService.isServiceRunning())tap(xy[0],xy[1]);};pendingCompilation.add(r);handler.postDelayed(r,d);}final int n=clean.length(),s=skipped;Runnable f=()->{if(!compiling)return;compiling=false;pendingCompilation.clear();calibratedCenters=null;ScreenCaptureService.resetLastClue();updateOverlayText("✅ COMPILATA: "+clean+"\nGià presenti: "+s+"/"+n);};pendingCompilation.add(f);handler.postDelayed(f,Math.max(300,index*240L+300L));}
