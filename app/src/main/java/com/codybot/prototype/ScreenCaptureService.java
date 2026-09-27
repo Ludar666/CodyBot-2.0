@@ -54,10 +54,6 @@ public class ScreenCaptureService extends Service {
             if (running) {
                 updateStatus();
             } else if (projection != null) {
-                // Dopo STOP il servizio mantiene la MediaProjection, ma il
-                // vecchio ImageReader/VirtualDisplay può non riprendere
-                // correttamente la consegna dei frame. Ricreiamo quindi solo
-                // la pipeline di cattura, senza chiedere di nuovo il permesso.
                 restartScanning();
                 updateStatus();
             } else {
@@ -166,10 +162,6 @@ public class ScreenCaptureService extends Service {
                     image=r.acquireLatestImage();
                     if(image==null)return;
 
-                    // Schema capture has priority over the normal OCR throttle.
-                    // ImageReader frames are acquired and released on every pass.
-                    // This follows the Android recommendation to use acquireLatestImage()
-                    // and close the acquired Image promptly.
                     if(schemaCaptureRequested && schemaTarget!=null){
                         schemaCaptureRequested=false;
                         CodyAccessibilityService target=schemaTarget;
@@ -228,230 +220,65 @@ public class ScreenCaptureService extends Service {
     }
 
     private void runOcr(Bitmap bmp,int detectedLength){
-        if(!running){
-            bmp.recycle();
-            return;
-        }
-
+        if(!running){ bmp.recycle(); return; }
         InputImage input=InputImage.fromBitmap(bmp,0);
         recognizer.process(input).addOnSuccessListener(result->{
             bmp.recycle();
             if(!running)return;
-
             String clue=extractClue(result);
             if(clue.isEmpty())return;
-
             String normalized=normalizeClue(clue);
             if(normalized.isEmpty() || normalized.equals(normalizeClue(lastClue)))return;
-
             lastClue=clue;
             broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nCASELLE: "+(detectedLength>0?detectedLength:"?")+"\nRicerca risposta...",clue);
-
             String ans=AnswerResolver.resolve(this,clue,detectedLength);
             if(!running)return;
-
-            if(ans!=null && !ans.startsWith("NON TROVATA") && !ans.startsWith("Nessun")
-                    && (detectedLength <= 0 || answerLetterCount(ans) == detectedLength)){
+            if(ans!=null && !ans.startsWith("NON TROVATA") && !ans.startsWith("Nessun") && (detectedLength <= 0 || answerLetterCount(ans) == detectedLength)){
                 broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: "+ans+"\nCompilazione...",ans);
-                Intent x=new Intent("com.codybot.FILL_ANSWER");
-                x.setPackage(getPackageName());
-                x.putExtra("answer",ans);
-                sendBroadcast(x);
-            }else{
-                broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: NON TROVATA","");
-            }
-        }).addOnFailureListener(e->{
-            bmp.recycle();
-            if(running)broadcast("🟢 SCANSIONE ATTIVA\nOCR: ERRORE","");
-        });
+                Intent x=new Intent("com.codybot.FILL_ANSWER"); x.setPackage(getPackageName()); x.putExtra("answer",ans); sendBroadcast(x);
+            }else broadcast("🟢 SCANSIONE ATTIVA\nINDIZIO: "+clue+"\nRISPOSTA: NON TROVATA","");
+        }).addOnFailureListener(e->{ bmp.recycle(); if(running)broadcast("🟢 SCANSIONE ATTIVA\nOCR: ERRORE",""); });
     }
 
-    private int answerLetterCount(String answer){
-        if(answer==null)return 0;
-        return AnswerResolver.normalizeText(answer).replaceAll("[^a-z]","").length();
-    }
+    private int answerLetterCount(String answer){ if(answer==null)return 0; return AnswerResolver.normalizeText(answer).replaceAll("[^a-z]","").length(); }
 
     private int detectAnswerLength(Bitmap bmp,int w,int h){
         try{
-            int y0=(int)(h*.40f), y1=(int)(h*.62f);
-            int[] score=new int[w];
-            for(int x=1;x<w-1;x++){
-                int hits=0;
-                for(int y=y0;y<y1;y+=2){
-                    int a=lum(bmp.getPixel(x-1,y));
-                    int b=lum(bmp.getPixel(x,y));
-                    int c=lum(bmp.getPixel(x+1,y));
-                    if(Math.abs(b-a)>38 || Math.abs(c-b)>38) hits++;
-                }
-                score[x]=hits;
-            }
-            ArrayList<Integer> peaks=new ArrayList<>();
-            int threshold=Math.max(5,(y1-y0)/10);
-            boolean in=false; int start=0;
-            for(int x=1;x<w-1;x++){
-                if(score[x]>=threshold){ if(!in){in=true;start=x;} }
-                else if(in){
-                    int end=x-1;
-                    int best=start;
-                    for(int k=start;k<=end;k++) if(score[k]>score[best]) best=k;
-                    peaks.add(best); in=false;
-                }
-            }
-            if(in)peaks.add(start);
-            if(peaks.size()<3)return -1;
-
-            int bestCount=-1;
-            for(int i=0;i<peaks.size();i++){
-                for(int j=i+2;j<peaks.size();j++){
-                    int span=peaks.get(j)-peaks.get(i);
-                    int n=j-i;
-                    if(span<90 || span>Math.min(1800,w*.92))continue;
-                    double pitch=(double)span/n;
-                    if(pitch<18 || pitch>180)continue;
-                    int count=0;
-                    for(int k=i;k<=j;k++){
-                        double expected=peaks.get(i)+(k-i)*pitch;
-                        if(Math.abs(peaks.get(k)-expected)<=pitch*.28)count++;
-                    }
-                    if(count==n+1 && n>=2 && n<=15){
-                        int slots=n;
-                        if(slots>bestCount)bestCount=slots;
-                    }
-                }
-            }
-            return (bestCount>=2 && bestCount<=15)?bestCount:-1;
-        }catch(Exception ignored){ return -1; }
+            int y0=(int)(h*.40f), y1=(int)(h*.62f); int[] score=new int[w];
+            for(int x=1;x<w-1;x++){int hits=0;for(int y=y0;y<y1;y+=2){int a=lum(bmp.getPixel(x-1,y));int b=lum(bmp.getPixel(x,y));int c=lum(bmp.getPixel(x+1,y));if(Math.abs(b-a)>38||Math.abs(c-b)>38)hits++;}score[x]=hits;}
+            ArrayList<Integer> peaks=new ArrayList<>();int threshold=Math.max(5,(y1-y0)/10);boolean in=false;int start=0;
+            for(int x=1;x<w-1;x++){if(score[x]>=threshold){if(!in){in=true;start=x;}}else if(in){int end=x-1,best=start;for(int k=start;k<=end;k++)if(score[k]>score[best])best=k;peaks.add(best);in=false;}}
+            if(in)peaks.add(start);if(peaks.size()<3)return -1;int bestCount=-1;
+            for(int i=0;i<peaks.size();i++)for(int j=i+2;j<peaks.size();j++){int span=peaks.get(j)-peaks.get(i),n=j-i;if(span<90||span>Math.min(1800,w*.92))continue;double pitch=(double)span/n;if(pitch<18||pitch>180)continue;int count=0;for(int k=i;k<=j;k++){double expected=peaks.get(i)+(k-i)*pitch;if(Math.abs(peaks.get(k)-expected)<=pitch*.28)count++;}if(count==n+1&&n>=2&&n<=15)bestCount=Math.max(bestCount,n);}
+            return bestCount>=2&&bestCount<=15?bestCount:-1;
+        }catch(Exception ignored){return -1;}
     }
-
-    private int lum(int color){
-        return (int)(0.299f*((color>>16)&255)+0.587f*((color>>8)&255)+0.114f*(color&255));
-    }
-
-    private String normalizeOcrText(String text){
-        if(text==null)return "";
-
-        // Normalizzazione pensata per il vocabolario italiano e per i limiti
-        // della tastiera CodyCross: tutti i caratteri accentati/strani che
-        // possono rappresentare una vocale italiana vengono ricondotti alla
-        // lettera base. Il testo mostrato all'utente resta quello OCR originale;
-        // questa conversione serve solo alla ricerca interna.
-        String s=Normalizer.normalize(text, Normalizer.Form.NFD);
-        s=s.replaceAll("\\p{M}+","");
-
-        s=s.replace('à','a').replace('á','a').replace('â','a').replace('ä','a').replace('ã','a')
-         .replace('À','A').replace('Á','A').replace('Â','A').replace('Ä','A').replace('Ã','A')
-         .replace('è','e').replace('é','e').replace('ê','e').replace('ë','e')
-         .replace('È','E').replace('É','E').replace('Ê','E').replace('Ë','E')
-         .replace('ì','i').replace('í','i').replace('î','i').replace('ï','i')
-         .replace('Ì','I').replace('Í','I').replace('Î','I').replace('Ï','I')
-         .replace('ò','o').replace('ó','o').replace('ô','o').replace('ö','o').replace('õ','o')
-         .replace('Ò','O').replace('Ó','O').replace('Ô','O').replace('Ö','O').replace('Õ','O')
-         .replace('ù','u').replace('ú','u').replace('û','u').replace('ü','u')
-         .replace('Ù','U').replace('Ú','U').replace('Û','U').replace('Ü','U');
-
-        s=s.replace('ç','c').replace('Ç','C')
-         .replace('ñ','n').replace('Ñ','N')
-         .replace('ø','o').replace('Ø','O')
-         .replace('ð','d').replace('Ð','D')
-         .replace('þ','t').replace('Þ','T')
-         .replace('ß','s')
-         .replace("\u2019","'").replace("\u2018", "'")
-         .replace("\u2010","-").replace("\u2011","-").replace("\u2013","-").replace("\u2014","-");
-
-        return s;
-    }
-
-    private String extractClue(Text result){
-        StringBuilder out=new StringBuilder();
-
-        for(Text.TextBlock block: result.getTextBlocks()){
-            String value=block.getText();
-            if(value==null)continue;
-
-            value=normalizeOcrText(value);
-            value=value.replaceAll("\\s+"," ").trim();
-            if(value.isEmpty())continue;
-
-            value=value.replaceAll("(?i)\\bCodyCross\\b"," ");
-            value=value.replaceAll("(?i)\\bORIZZONTALE\\b"," ");
-            value=value.replaceAll("(?i)\\bVERTICALE\\b"," ");
-            value=value.replaceAll("(?i)\\bINDIZIO\\b\\s*: ?"," ");
-
-            value=value.replaceAll("(?<![A-Za-zÀ-ÖØ-öø-ÿ])(?:\\d+[+%]?\\s*){2,}", " ");
-            value=value.replaceAll("(?<![A-Za-zÀ-ÖØ-öø-ÿ])\\d{2,4}(?=\\s|$)", " ");
-
-            value=value.replaceAll("(?i)(?<=[A-Za-zÀ-ÖØ-öø-ÿ])0(?=[A-Za-zÀ-ÖØ-öø-ÿ])","o");
-            value=value.replaceAll("\\s+"," ").trim();
-
-            String letters=value.replaceAll("[^A-Za-zÀ-ÖØ-öø-ÿ0-9]","");
-            if(letters.length()<2)continue;
-
-            if(out.length()>0)out.append(" ");
-            out.append(value);
-        }
-
-        String clue=out.toString()
-                .replaceAll("[|_]+"," ")
-                .replaceAll("\\s+"," ")
-                .trim();
-
-        if(clue.length()>140)clue=clue.substring(0,140).trim();
-        return clue;
-    }
-
-    private String normalizeClue(String s){
-        if(s==null)return "";
-        s=normalizeOcrText(s).toLowerCase();
-        return s.replaceAll("[^a-z0-9 ]","")
-                .replaceAll("\\s+"," ")
-                .trim();
-    }
-    private void broadcast(String msg,String clue){
-        Intent x=new Intent("com.codybot.UPDATE_OVERLAY");
-        x.setPackage(getPackageName());
-        x.putExtra("message",msg);
-        x.putExtra("clue",clue);
-        sendBroadcast(x);
-    }
-
-    private void updateStatus(){
-        broadcast(running?"🟢 SCANSIONE ATTIVA":"🔴 SCANSIONE FERMA","");
-    }
-
-    private void stopScanning(){
-        running=false;
-        lastClue="";
-        lastScan=0;
-        broadcast("🔴 SCANSIONE IN PAUSA","");
-    }
-
-    private void stopCapture(){
-        stopScanning();
-        if(projection!=null){projection.stop();projection=null;}
-    }
-
-    public static void resetLastClue(){
-        if(instance!=null){
-            instance.lastClue="";
-            instance.lastScan=0;
-        }
-    }
-
+    private int lum(int color){return (int)(0.299f*((color>>16)&255)+0.587f*((color>>8)&255)+0.114f*(color&255));}
+    private String normalizeOcrText(String text){if(text==null)return "";String s=Normalizer.normalize(text,Normalizer.Form.NFD);s=s.replaceAll("\\p{M}+","");return s;}
+    private String extractClue(Text result){StringBuilder out=new StringBuilder();for(Text.TextBlock block:result.getTextBlocks()){String value=block.getText();if(value==null)continue;value=normalizeOcrText(value).replaceAll("\\s+"," ").trim();if(value.isEmpty())continue;value=value.replaceAll("(?i)\\bCodyCross\\b"," ").replaceAll("(?i)\\bORIZZONTALE\\b"," ").replaceAll("(?i)\\bVERTICALE\\b"," ").replaceAll("(?i)\\bINDIZIO\\b\\s*: ?"," ").replaceAll("\\s+"," ").trim();if(value.length()<2)continue;if(out.length()>0)out.append(" ");out.append(value);}String clue=out.toString().replaceAll("[|_]+"," ").replaceAll("\\s+"," ").trim();return clue.length()>140?clue.substring(0,140).trim():clue;}
+    private String normalizeClue(String s){if(s==null)return "";return normalizeOcrText(s).toLowerCase().replaceAll("[^a-z0-9 ]","").replaceAll("\\s+"," ").trim();}
+    private void broadcast(String msg,String clue){Intent x=new Intent("com.codybot.UPDATE_OVERLAY");x.setPackage(getPackageName());x.putExtra("message",msg);x.putExtra("clue",clue);sendBroadcast(x);}
+    private void updateStatus(){broadcast(running?"🟢 SCANSIONE ATTIVA":"🔴 SCANSIONE FERMA","");}
+    private void stopScanning(){running=false;lastClue="";lastScan=0;broadcast("🔴 SCANSIONE IN PAUSA","");}
+    private void stopCapture(){stopScanning();if(projection!=null){projection.stop();projection=null;}}
+    public static void resetLastClue(){if(instance!=null){instance.lastClue="";instance.lastScan=0;}}
     public static boolean isServiceRunning(){return running;}
 
     public static boolean requestSchemaCapture(CodyAccessibilityService target){
-        if(instance==null||target==null||!running||instance.reader==null)return false;
+        if(instance==null||target==null)return false;
+        if(!running||instance.reader==null){
+            if(instance.projection==null){
+                instance.requestProjection();
+                return false;
+            }
+            instance.startScanning();
+        }
+        if(!running||instance.reader==null)return false;
         instance.schemaTarget=target;
         instance.schemaCaptureRequested=true;
         return true;
     }
 
     @Nullable @Override public IBinder onBind(Intent i){return null;}
-
-    @Override public void onDestroy(){
-        stopCapture();
-        if(recognizer!=null)recognizer.close();
-        if(instance==this) instance=null;
-        super.onDestroy();
-    }
+    @Override public void onDestroy(){stopCapture();if(recognizer!=null)recognizer.close();if(instance==this)instance=null;super.onDestroy();}
 }
