@@ -674,7 +674,7 @@ private void loadManualCalibration(){
  private boolean hasSchemaCalibration(int length){return getSchemaCenters(length)!=null;}
  private void testSchemaCalibration(int length){
  stopCompilation();hideMainScanOverlay();schemaTestLength=length;schemaTestRow=1;schemaTestMode=0;schemaTestCenters=getSchemaRowCenters(1,length);schemaTestArmed=true;
- updateOverlayText("🧪 TEST SCHEMA PRONTO\nPassa a CodyCross.\nIl pannello comparirà quando CodyCross è visibile.");
+ updateOverlayText("🧪 TEST SCHEMA PRONTO\nPassa a CodyCross.\nIl pannello comparirà quando CodyCross è visibile.");\n // Se CodyCross è già aperto, non arriva un nuovo AccessibilityEvent: mostra il pannello comunque.\n handler.postDelayed(()->{try{android.view.accessibility.AccessibilityNodeInfo root=getRootInActiveWindow();String pkg=root!=null&&root.getPackageName()!=null?root.getPackageName().toString():"";if(!pkg.isEmpty()&&!pkg.equals(getPackageName())&&schemaTestArmed)showSchemaTestReadyOverlay();}catch(Exception ignored){}},350);
 }
 private void showSchemaTestReadyOverlay(){
  if(!Settings.canDrawOverlays(this))return;if(schemaTestControls!=null)removeSchemaTestControls();
