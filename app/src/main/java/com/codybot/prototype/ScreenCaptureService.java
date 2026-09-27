@@ -11,6 +11,7 @@ import android.media.projection.MediaProjectionManager;
 import android.os.*;
 import android.util.DisplayMetrics;
 import androidx.annotation.Nullable;
+import com.codybot.app.CodyAccessibilityService;
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
