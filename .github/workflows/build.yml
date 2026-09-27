@@ -27,12 +27,9 @@ jobs:
           gradle-version: '8.7'
 
       - name: Build Debug APK
-        id: build_apk
-        continue-on-error: true
         run: |
           set -o pipefail
           gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
-          exit ${PIPESTATUS[0]}
 
       - name: Upload build log
         if: always()
@@ -41,10 +38,6 @@ jobs:
           name: CodyBot-build-log
           path: build.log
           if-no-files-found: ignore
-
-      - name: Fail if build failed
-        if: steps.build_apk.outcome == 'failure'
-        run: exit 1
 
       - name: Verify APK
         run: |
