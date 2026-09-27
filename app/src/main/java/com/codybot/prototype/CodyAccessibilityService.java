@@ -681,7 +681,7 @@ private void showSchemaTestReadyOverlay(){
  LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setGravity(Gravity.CENTER_HORIZONTAL);p.setPadding(22,16,22,16);p.setBackgroundColor(Color.parseColor("#EE111111"));
  TextView t=new TextView(this);t.setText("🧪 TEST SCHEMA");t.setTextColor(Color.WHITE);t.setTextSize(19);t.setGravity(Gravity.CENTER);p.addView(t,new LinearLayout.LayoutParams(-1,-2));
  TextView m=new TextView(this);m.setText("CodyCross è pronto.\nScegli riga e modalità, poi premi AVVIA TEST.");m.setTextColor(Color.WHITE);m.setTextSize(15);m.setGravity(Gravity.CENTER);m.setPadding(0,10,0,12);p.addView(m,new LinearLayout.LayoutParams(-1,-2));
- Button start=new Button(this);start.setText("▶ AVVIA TEST");start.setOnClickListener(v->{removeSchemaTestControls();showSchemaTestTypeSelection();});
+ Button start=new Button(this);start.setText("▶ AVVIA TEST");start.setOnClickListener(v->{removeSchemaTestControls();showSchemaTestControls();});
  Button cancel=new Button(this);cancel.setText("ANNULLA");cancel.setOnClickListener(v->{schemaTestArmed=false;removeSchemaTestControls();schemaTestCenters=null;restoreMainScanOverlay();});
  LinearLayout rr=new LinearLayout(this);rr.setGravity(Gravity.CENTER);rr.addView(start);rr.addView(cancel);p.addView(rr);schemaTestControls=p;addSchemaTestView(p,95);
 }
