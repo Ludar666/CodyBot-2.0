@@ -26,6 +26,24 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Repair generated schema test source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/codybot/prototype/CodyAccessibilityService.java')
+          s = p.read_text()
+          marker = 'private void startSchemaTest(){\\n'
+          if marker in s:
+              start = s.index(marker)
+              end = s.index('\nprivate void runSchemaRead()', start)
+              fixed = '''private void startSchemaTest(){
+ schemaTestRunning=true;schemaTestPaused=false;schemaTestCapturePending=false;
+ if(schemaTestMode==1)runSchemaRead();else if(schemaTestMode==2)runSchemaCoordinateCheck();else if(schemaTestMode==3)runSchemaPositionOverlay();else refreshSchemaTestStatus();
+}'''
+              s = s[:start] + fixed + s[end:]
+              p.write_text(s)
+          PY
+
       - name: Build Debug APK
         run: |
           set -o pipefail
