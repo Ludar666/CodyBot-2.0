@@ -1,0 +1,44 @@
+name: Fix schema test link
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor == 'Ludar666'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fix missing method reference
+        shell: bash
+        run: |
+          FILE="app/src/main/java/com/codybot/prototype/CodyAccessibilityService.java"
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("app/src/main/java/com/codybot/prototype/CodyAccessibilityService.java")
+          s = p.read_text(encoding="utf-8")
+          old = 'removeSchemaTestControls();showSchemaTestTypeSelection();'
+          new = 'removeSchemaTestControls();showSchemaTestControls();'
+          if old not in s:
+              raise SystemExit("pattern not found")
+          p.write_text(s.replace(old, new, 1), encoding="utf-8")
+          PY
+
+      - name: Commit fix and remove temporary workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-schema-test-link.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/codybot/prototype/CodyAccessibilityService.java .github/workflows/fix-schema-test-link.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix avvio Test Schemi"
+          git push
