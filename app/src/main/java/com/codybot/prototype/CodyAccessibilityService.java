@@ -674,7 +674,8 @@ private void loadManualCalibration(){
  private boolean hasSchemaCalibration(int length){return getSchemaCenters(length)!=null;}
  private void testSchemaCalibration(int length){
  stopCompilation();hideMainScanOverlay();schemaTestLength=length;schemaTestRow=1;schemaTestMode=0;schemaTestCenters=getSchemaRowCenters(1,length);schemaTestArmed=true;
- updateOverlayText("🧪 TEST SCHEMA PRONTO\nPassa a CodyCross.\nIl pannello comparirà quando CodyCross è visibile.");\n handler.postDelayed(this::showSchemaTestReadyOverlay,350);
+ updateOverlayText("🧪 TEST SCHEMA PRONTO\nPassa a CodyCross.\nIl pannello comparirà quando CodyCross è visibile.");
+ handler.postDelayed(this::showSchemaTestReadyOverlay,350);
 }
 private void showSchemaTestReadyOverlay(){
  if(!Settings.canDrawOverlays(this))return;if(schemaTestControls!=null)removeSchemaTestControls();
