@@ -11,6 +11,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CODYBOT_SIGNING_KEYSTORE_B64: ${{ secrets.CODYBOT_SIGNING_KEYSTORE_B64 }}
+      CODYBOT_SIGNING_STORE_PASSWORD: ${{ secrets.CODYBOT_SIGNING_STORE_PASSWORD }}
+      CODYBOT_SIGNING_KEY_ALIAS: ${{ secrets.CODYBOT_SIGNING_KEY_ALIAS }}
+      CODYBOT_SIGNING_KEY_PASSWORD: ${{ secrets.CODYBOT_SIGNING_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,10 +34,28 @@ jobs:
       - name: Repair schema test source
         run: python3 -c 'from pathlib import Path; import re; p=Path("app/src/main/java/com/codybot/prototype/CodyAccessibilityService.java"); s=p.read_text(); pattern=r"private void startSchemaTest\(\)\{\\n.*?\nprivate void runSchemaRead\(\)"; replacement="private void startSchemaTest(){\n schemaTestRunning=true;schemaTestPaused=false;schemaTestCapturePending=false;\n if(schemaTestMode==1)runSchemaRead();else if(schemaTestMode==2)runSchemaCoordinateCheck();else if(schemaTestMode==3)runSchemaPositionOverlay();else refreshSchemaTestStatus();\n}\nprivate void runSchemaRead()"; s2=re.sub(pattern,replacement,s,count=1,flags=re.S); assert s2!=s, "schema test source pattern not found"; p.write_text(s2)'
 
-      - name: Build Debug APK
+      - name: Prepare persistent signing
+        id: signing
+        shell: bash
+        run: |
+          if [ -n "$CODYBOT_SIGNING_KEYSTORE_B64" ] && [ -n "$CODYBOT_SIGNING_STORE_PASSWORD" ] && [ -n "$CODYBOT_SIGNING_KEY_ALIAS" ] && [ -n "$CODYBOT_SIGNING_KEY_PASSWORD" ]; then
+            echo "$CODYBOT_SIGNING_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/codybot-release.jks"
+            test -s "$RUNNER_TEMP/codybot-release.jks"
+            echo "CODYBOT_SIGNING_STORE=$RUNNER_TEMP/codybot-release.jks" >> "$GITHUB_ENV"
+            echo "CODYBOT_SIGNED=true" >> "$GITHUB_ENV"
+          else
+            echo "CODYBOT_SIGNED=false" >> "$GITHUB_ENV"
+            echo "::warning::Persistent signing secrets are not configured; building debug APK."
+          fi
+
+      - name: Build APK
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          if [ "$CODYBOT_SIGNED" = "true" ]; then
+            gradle :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+          else
+            gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          fi
 
       - name: Upload build log
         if: always()
@@ -44,7 +67,11 @@ jobs:
 
       - name: Verify APK
         run: |
-          APK=app/build/outputs/apk/debug/app-debug.apk
+          if [ "$CODYBOT_SIGNED" = "true" ]; then
+            APK=app/build/outputs/apk/release/app-release.apk
+          else
+            APK=app/build/outputs/apk/debug/app-debug.apk
+          fi
           test -f "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 4 -v 4 "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
@@ -52,5 +79,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: CodyBot-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: CodyBot-${{ env.CODYBOT_SIGNED == 'true' && 'release-signed-apk' || 'debug-apk' }}
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
