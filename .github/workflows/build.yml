@@ -84,3 +84,5 @@ jobs:
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Triggered after repository signing secrets were configured.
