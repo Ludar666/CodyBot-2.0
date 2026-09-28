@@ -15,6 +15,33 @@ android {
     androidResources {
         noCompress 'arsc'
     }
+
+    // Release signing is enabled only when the persistent GitHub signing
+    // credentials are supplied by the build workflow.
+    def signingStore = System.getenv("CODYBOT_SIGNING_STORE")
+    def signingStorePassword = System.getenv("CODYBOT_SIGNING_STORE_PASSWORD")
+    def signingKeyAlias = System.getenv("CODYBOT_SIGNING_KEY_ALIAS")
+    def signingKeyPassword = System.getenv("CODYBOT_SIGNING_KEY_PASSWORD")
+
+    signingConfigs {
+        if (signingStore && signingStorePassword && signingKeyAlias && signingKeyPassword) {
+            release {
+                storeFile file(signingStore)
+                storePassword signingStorePassword
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (signingStore && signingStorePassword && signingKeyAlias && signingKeyPassword) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+        }
+    }
 }
 
 dependencies {
