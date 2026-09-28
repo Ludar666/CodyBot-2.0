@@ -8,8 +8,8 @@ android {
         applicationId 'com.codybot.app'
         minSdk 24
         targetSdk 30
-        versionCode 36
-        versionName '3.6'
+        versionCode 37
+        versionName '3.7'
     }
 
     androidResources {
