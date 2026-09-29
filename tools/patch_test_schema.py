@@ -106,7 +106,7 @@ method='''private int[] shiftSchemaCentersVertically(Bitmap b,int[] base){
  }
  for(int i=0;i<base.length/2;i++){out[i*2]=Math.round((base[i*2]-540f)*bestSx+540f+bestDx);out[i*2+1]=Math.round((base[i*2+1]-1200f)*bestSy+1200f+bestDy);}
  if(Math.abs(bestDx)>=10||Math.abs(bestDy)>=20||Math.abs(bestSx-1f)>.03f||Math.abs(bestSy-1f)>.03f)
-  updateOverlayText("🟢 SCHEMA RILEVATO\nScala X: "+String.format(java.util.Locale.US,"%.2f",bestSx)+"  Y: "+String.format(java.util.Locale.US,"%.2f",bestSy)+"\nSpostamento: "+bestDx+", "+bestDy);
+  updateOverlayText("🟢 SCHEMA RILEVATO\\nScala X: "+String.format(java.util.Locale.US,"%.2f",bestSx)+"  Y: "+String.format(java.util.Locale.US,"%.2f",bestSy)+"\\nSpostamento: "+bestDx+", "+bestDy);
  return out;
  }
 
