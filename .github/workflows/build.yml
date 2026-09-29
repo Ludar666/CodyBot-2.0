@@ -32,7 +32,22 @@ jobs:
           gradle-version: '8.7'
 
       - name: Repair schema test source
-        run: python3 -c 'from pathlib import Path; import re; p=Path("app/src/main/java/com/codybot/prototype/CodyAccessibilityService.java"); s=p.read_text(); pattern=r"private void startSchemaTest\(\)\{\\n.*?\nprivate void runSchemaRead\(\)"; replacement="private void startSchemaTest(){\n schemaTestRunning=true;schemaTestPaused=false;schemaTestCapturePending=false;\n if(schemaTestMode==1)runSchemaRead();else if(schemaTestMode==2)runSchemaCoordinateCheck();else if(schemaTestMode==3)runSchemaPositionOverlay();else refreshSchemaTestStatus();\n}\nprivate void runSchemaRead()"; s2=re.sub(pattern,replacement,s,count=1,flags=re.S); assert s2!=s, "schema test source pattern not found"; p.write_text(s2)'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("app/src/main/java/com/codybot/prototype/CodyAccessibilityService.java")
+          s = p.read_text()
+          pattern = r"private void startSchemaTest\(\)\{\\n.*?\nprivate void runSchemaRead\(\)"
+          replacement = """private void startSchemaTest(){
+           schemaTestRunning=true;schemaTestPaused=false;schemaTestCapturePending=false;
+           if(schemaTestMode==1)runSchemaRead();else if(schemaTestMode==2)runSchemaCoordinateCheck();else if(schemaTestMode==3)runSchemaPositionOverlay();else refreshSchemaTestStatus();
+          }
+          private void runSchemaRead()"""
+          s2 = re.sub(pattern, replacement, s, count=1, flags=re.S)
+          assert s2 != s, "schema test source pattern not found"
+          p.write_text(s2)
+          PY
 
       - name: Apply Test Schemi defaults and foreground fix
         run: python3 tools/patch_test_schema.py
